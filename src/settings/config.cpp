@@ -113,7 +113,7 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
           po::value<string>()->default_value(string("NONESEARCH"))->notifier(
               boost::bind(&Config::setSearch, this, _1)),
           "Search type.\n"
-          "Valid options NONESEARCH, FIRST, ALL, OPTIMIZE, OPTIMIZE_IT, GIST_ALL, GIST_OPT. ")
+          "Valid options NONESEARCH, FIRST, ALL, OPTIMIZE, OPTIMIZE_IT, GIST_ALL, GIST_OPT, META_HEU. ")
       ("dse.criteria",
           po::value<vector<string>>()->multitoken()->default_value({"NONE",""},
               "NONE ")->notifier(boost::bind(&Config::setCriteria, this, _1)),
@@ -145,7 +145,7 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
                po::value<string>()->default_value(string("ALL"))->notifier(
                   boost::bind(&Config::setPresolverSearch, this, _1)),
              "Search type.\n"
-             "Valid options NONESEARCH, FIRST, ALL, OPTIMIZE, OPTIMIZE_IT, GIST_ALL, GIST_OPT. ");
+             "Valid options NONESEARCH, FIRST, ALL, OPTIMIZE, OPTIMIZE_IT, GIST_ALL, GIST_OPT, META_HEU. ");
 
   po::variables_map vm;
   po::options_description visible_options, all_options;
@@ -351,6 +351,7 @@ Config::SearchTypes stringToSearch (const string &str) throw (InvalidFormatExcep
   else if (str == "OPTIMIZE_IT") return Config::OPTIMIZE_IT;
   else if (str == "GIST_ALL")    return Config::GIST_ALL;
   else if (str == "GIST_OPT")    return Config::GIST_OPT;
+  else if (str == "META_HEU")    return Config::META_HEU;
   else THROW_EXCEPTION(InvalidFormatException, str, "invalid option");
 }
 
@@ -414,6 +415,7 @@ string searchTypeToString(Config::SearchTypes freq) throw (InvalidFormatExceptio
   else if (freq == Config::OPTIMIZE_IT) return "OPTIMIZE_IT";
   else if (freq == Config::GIST_ALL)    return "GIST_ALL";
   else if (freq == Config::GIST_OPT)    return "GIST_OPT";
+  else if (freq == Config::META_HEU)    return "META_HEU";
   else THROW_EXCEPTION(InvalidFormatException, "searchTypeToString", "invalid option");
 }
 string Config::get_search_type() const {

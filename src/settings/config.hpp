@@ -87,7 +87,8 @@ public:
     OPTIMIZE,
     OPTIMIZE_IT,
     GIST_ALL,
-    GIST_OPT
+    GIST_OPT,
+    META_HEU
   };
   enum OptCriterion {
     NONE,
