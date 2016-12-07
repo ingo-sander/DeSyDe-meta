@@ -28,7 +28,7 @@
 # MODULE PATH AND FILES
 #=======================
 
-CPP_FILES := mapping.cpp
+CPP_FILES := mapping.cpp design.cpp
 
 
 
