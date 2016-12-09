@@ -72,9 +72,11 @@ class Design {
 
   };
 public:
-    Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>, vector<int>, vector<int>);    
+    Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>,
+           vector<int>, vector<int>, vector<int>, vector<int>, vector<int>);    
     ~Design(){};
-    vector<int> get_throughput();
+    vector<int> get_periods();
+    int get_energy();
 private:
     Mapping* mapping; /**< reference to the mapping class. */
     Applications* applications; /**< reference to the applications class. */
@@ -82,7 +84,6 @@ private:
     size_t no_actors; /**< total number of actors and tasks. */
     size_t no_channels; /**< total number of channels. */
     size_t no_processors; /**< total number of processors. */
-    vector<int> tdmaAlloc; /**< mappings of TDMA slots to processors. */
     vector<int> proc_mappings; /**< current mappings of entities (actors and tasks) to processors. */
     vector<int> proc_modes; /**< current processors modes. */
     vector<int> next; /**< current communication orders */
@@ -90,17 +91,20 @@ private:
     vector<int> wcet; /**< Worst-Case Execution Times (WCET) of actors. */
     vector<int> memCons; /**< memory consumption on each proc. */
     vector<int> sendingLatency; /**< Worst-Case Blocking Times. */
-    //vector<int> sendbufferSz; /**< send buffer sizes (same proc=0). */
     vector<int> receivingTime; /**< WC receiving times (0 on TDMA). */
     vector<int> sendingNext; /**< a schedule for sent messages on interconnect. */
     vector<int> receivingNext; /**< a schedule for sent messages on interconnect. */
-    //vector<int> recbufferSz; /**< receive buffer sizes (same proc=0). */
+    vector<int> tdmaAlloc; /**< mappings of TDMA slots to processors. */
+    vector<int> sendbufferSz; /**< send buffer sizes (same proc=0). */
+    vector<int> recbufferSz; /**< receive buffer sizes (same proc=0). */
     vector<int> appIndex; /**< appIndex[i] is index of last actor of application i.*/
     unordered_map<int,vector<SuccessorNode>> msaGraph;/**< for construction of the mapping and scheduling aware graph. */
     boost_msag_des b_msag; /** MSAG representation for boost. */
     vector<boost_msag_des*> b_msags; /**< MSAG representation for boost. */
     vector<int> channelMapping;/**< for mapping from msag send/rec actors to appG-channels.*/
     vector<int> receivingActors;/**< receivingActors: for storing/finding the first receiving actor for each dst. */
+    vector<int> periods;
+    int energy;
     size_t n_msagActors;
     /**
      * Constructs Mapping and Scheduling Aware Graph (MSAG).
@@ -118,5 +122,8 @@ private:
      * (i) sendingTime, (ii) sendingLatency, (iii) receivingTime (iv) wcet (v) memCons
      */ 
     void init_vectors();
+    void calc_periods();
+    void calc_energy();
+    void print_vector(vector<int>);
     void printThroughputGraphAsDot(const string &dir) const;
 };

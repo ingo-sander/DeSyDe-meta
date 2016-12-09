@@ -3,7 +3,8 @@
 using namespace std;
 Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc_mappings,
                vector<int>_proc_modes, vector<int> _next, vector<int> _sendingNext, 
-               vector<int> _receivingNext):
+               vector<int> _receivingNext, vector<int> _tdmaAlloc, 
+               vector<int>  _sendbufferSz, vector<int>  _recbufferSz):
     mapping(_mapping),
     applications(_applications),
     no_entities(mapping->getNumberOfApps()),
@@ -14,7 +15,10 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
     proc_modes(_proc_modes),
     next(_next),
     sendingNext(_sendingNext),
-    receivingNext(_receivingNext)
+    receivingNext(_receivingNext),
+    tdmaAlloc(_tdmaAlloc),
+    sendbufferSz(_sendbufferSz),
+    recbufferSz(_recbufferSz)
     {
         if(proc_mappings.size() != no_actors)
            THROW_EXCEPTION(RuntimeException, "proc_mappings.size() != no_actors" );
@@ -34,6 +38,11 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
         }
         appIndex.push_back(no_actors-1);
         init_vectors();
+        cout << "sendingTime:"; print_vector(sendingTime);
+        cout << "sendingLatency:"; print_vector(sendingLatency);
+        cout << "memCons:"; print_vector(memCons);
+        cout << "receivingTime:"; print_vector(receivingTime);
+        cout << "wcet:"; print_vector(wcet);
     }
 
 void Design::constructMSAG() {
@@ -125,15 +134,15 @@ void Design::constructMSAG() {
       SuccessorNode srcCh;
       srcCh.successor_key = applications->getChannels()[i]->source;
       srcCh.delay = wcet[applications->getChannels()[i]->source];
-      //srcCh.min_tok = sendbufferSz[i];
-      //srcCh.max_tok = sendbufferSz[i];
+      srcCh.min_tok = sendbufferSz[i];
+      srcCh.max_tok = sendbufferSz[i];
 
       //add to boost-msag
       src = b::vertex(block_actor, b_msag);
       dst = b::vertex(applications->getChannels()[i]->source, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannels()[i]->source]);
-      //b::put(b::edge_weight2, b_msag, _e, sendbufferSz[i]);
+      b::put(b::edge_weight2, b_msag, _e, sendbufferSz[i]);
 
       n_msagChannels++;
       if(printDebug){
@@ -264,8 +273,8 @@ void Design::constructMSAG() {
       SuccessorNode succRec;
       succRec.successor_key = send_actor;
       succRec.delay = sendingTime[i];
-      //succRec.min_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
-      //succRec.max_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
+      succRec.min_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
+      succRec.max_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
       succRec.channel = i;
 
       //add to boost-msag
@@ -273,7 +282,7 @@ void Design::constructMSAG() {
       dst = b::vertex(send_actor, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, sendingTime[i]);
-      //b::put(b::edge_weight2, b_msag, _e, recbufferSz[i] - applications->getChannels()[i]->initTokens);
+      b::put(b::edge_weight2, b_msag, _e, recbufferSz[i] - applications->getChannels()[i]->initTokens);
 
       n_msagChannels++;
       if(printDebug)
@@ -618,8 +627,144 @@ int Design::getApp(int msagActor_id) const {
   return -1;
 }
 
-vector<int> Design::get_throughput(){
-    vector<int> thr;
+void checkApp_des(int app, unordered_map<int, set<int>>& coMappedApps, vector<int>& uncheckedApps, set<int>& res) {
+  res.insert(app);
+  uncheckedApps[app] = 0;
+  for(auto& appl : coMappedApps[app])
+    if(uncheckedApps[appl])
+      checkApp_des(appl, coMappedApps, uncheckedApps, res);
+}
+
+void Design::calc_periods(){
+    periods.clear();
+    periods.resize(applications->n_SDFApps(), 0);
+    vector<int> msagMap(applications->n_SDFApps(), 0);
+    bool printDebug = true;
+    
+    if(applications->n_SDFApps() > 1){
+    //check which application graphs are mapped to same processor (= combined into the same MSAG)
+    vector<set<int>> result;
+    unordered_map<int, set<int>> coMappedApps;
+    vector<int> uncheckedApps(appIndex.size(), 1);
+    for(size_t a = 0; a < appIndex.size(); a++){
+      coMappedApps.insert(pair<int, set<int>>(a, set<int>()));
+    }
+    for(int i = 0; i < (int) no_actors; i++){
+      if(next[i] < (int) no_actors){ //next[i] is decided and points to an application actor
+        int actor = i;
+        int nextActor = next[i];
+        if(getApp(actor) != getApp(nextActor)){ //from different applications
+          unordered_map<int, set<int>>::const_iterator it = coMappedApps.find(getApp(actor));
+          if(it != coMappedApps.end()){ //i already has an entry in the map
+            coMappedApps.at(getApp(actor)).insert(getApp(nextActor));
+          }else{ //no entry for ch_src[i] yet
+            set<int> coApp;
+            coApp.insert(getApp(nextActor));
+            coMappedApps.insert(pair<int, set<int>>(getApp(actor), coApp));
+          }
+          it = coMappedApps.find(getApp(nextActor));
+          if(it != coMappedApps.end()){ //i already has an entry in the map
+            coMappedApps.at(getApp(nextActor)).insert(getApp(actor));
+          }else{ //no entry for ch_src[i] yet
+            set<int> coApp;
+            coApp.insert(getApp(actor));
+            coMappedApps.insert(pair<int, set<int>>(getApp(nextActor), coApp));
+          }
+        }
+      }
+    }
+//    if(coMappedApps.size() > 0){
+
+      int sum_unchecked = 0;
+      for(int x : uncheckedApps)
+        sum_unchecked += x;
+      while(sum_unchecked){
+
+        for(auto& mapp : coMappedApps){
+          if(printDebug){
+            cout << "App " << mapp.first << " is" << (mapp.second.empty() ? " not " : " ") << "co-mapped with ";
+            cout << (mapp.second.empty() ? string(" any other app") : tools::toString(mapp.second)) << endl;
+          }
+
+          if(uncheckedApps[mapp.first]){
+            set<int> res;
+            result.push_back(res);
+            checkApp_des(mapp.first, coMappedApps, uncheckedApps, result.back());
+          }
+        }
+
+        sum_unchecked = 0;
+        for(int x : uncheckedApps)
+          sum_unchecked += x;
+
+      }
+
+//    }else{
+//      for(size_t i = 0; i < wc_period.size(); i++){
+//        set<int> res;
+//        res.insert(i);
+//        result.push_back(res);
+//      }
+//    }
+    for(size_t i = 0; i < result.size(); i++){
+      b_msags.push_back(new boost_msag_des());
+      for(auto it = result[i].begin(); it != result[i].end(); ++it){
+        msagMap[*it] = i;
+      }
+    }
+    constructMSAG(msagMap);
+
+    if(printDebug){
+      //if(next.assigned() && wcet.assigned())
+      {
+        cout << "trying to print " << b_msags.size() << " boost-msags." << endl;
+        for(size_t t = 0; t < b_msags.size(); t++){
+          cout << "Graph " << t << endl;
+          cout << "  Vertices number: " << num_vertices(*b_msags[t]) << endl;
+          cout << "  Edges number: " << num_edges(*b_msags[t]) << endl;
+          string graphName = "boost_msag" + to_string(t);
+          ofstream out;
+          string outputFile = ".";
+          outputFile += (outputFile.back() == '/') ? (graphName + ".dot") : ("/" + graphName + ".dot");
+          out.open(outputFile.c_str());
+          write_graphviz(out, *b_msags[t]);
+          out.close();
+          cout << "  Printed dot graph file " << outputFile << endl;
+        }
+        printThroughputGraphAsDot(".");
+      }
+    }
+
+    vector<int> msag_mcrs;
+    for(auto m : b_msags){
+      using namespace boost;
+      int max_cr; /// maximum cycle ratio
+      typedef std::vector<graph_traits<boost_msag_des>::edge_descriptor> t_critCycl;
+      t_critCycl cc; ///critical cycle
+      property_map<boost_msag_des, vertex_index_t>::type vim = get(vertex_index, *m);
+      property_map<boost_msag_des, edge_weight_t>::type ew1 = get(edge_weight, *m);
+      property_map<boost_msag_des, edge_weight2_t>::type ew2 = get(edge_weight2, *m);
+
+      //do MCR analysis
+      max_cr = maximum_cycle_ratio(*m, vim, ew1, ew2, &cc);
+      msag_mcrs.push_back(max_cr);
+      if(printDebug){
+        cout << "Period of app(s) " << tools::toString(result[msag_mcrs.size()-1]) << ": ";
+        cout <<  max_cr << endl;
+        cout << "Critical cycle:\n";
+        for(t_critCycl::iterator itr = cc.begin(); itr != cc.end(); ++itr){
+          cout << "(" << vim[source(*itr, b_msag)] << "," << vim[target(*itr, b_msag)] << ") ";
+        }
+        cout << endl;
+      }
+    }
+    for(size_t i = 0; i < msag_mcrs.size(); i++){
+      for(auto r: result[i]){
+        periods[r] = msag_mcrs[i];        
+      }
+    }
+
+  }else{ //only a single application
     constructMSAG();
     using namespace boost;
     int max_cr; /// maximum cycle ratio
@@ -631,7 +776,7 @@ vector<int> Design::get_throughput(){
     property_map<boost_msag_des, edge_weight2_t>::type ew2 = get(edge_weight2, b_msag);
     //do MCR analysis
     max_cr = maximum_cycle_ratio(b_msag, vim, ew1, ew2, &cc);
-    thr.push_back(max_cr);
+    periods.push_back(max_cr);
 
     //if(printDebug)
     {
@@ -654,7 +799,7 @@ vector<int> Design::get_throughput(){
       }
       cout << endl;
     }
-    return thr;
+}
 }
 
 void Design::init_vectors(){
@@ -672,10 +817,11 @@ void Design::init_vectors(){
         int proc_src_i = proc_mappings[src_i];
         int proc_dest_i = proc_mappings[dest_i];    
         if(proc_src_i != proc_dest_i){
-             auto no_slots_i = std::count (tdmaAlloc.begin(), tdmaAlloc.end(), proc_src_i);
-             sendingTime.push_back(mapping->wcTransferTimes(i)[no_slots_i]);
+             cout << "channel " << i << " has communications delays\n";
+             cout << "wctt: "; print_vector(mapping->wcTransferTimes(i));
+             sendingTime.push_back(mapping->wcTransferTimes(i)[tdmaAlloc[proc_src_i]]);
              /// sendingLatency
-             sendingLatency.push_back(mapping->wcBlockingTimes()[no_slots_i]);    
+             sendingLatency.push_back(mapping->wcBlockingTimes()[tdmaAlloc[proc_src_i]]);    
              /// memCons
              memCons[proc_src_i] += applications->getChannels()[i]->messageSize;
              memCons[proc_dest_i] += applications->getChannels()[i]->messageSize;
@@ -947,8 +1093,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
       SuccessorNode srcCh;
       srcCh.successor_key = applications->getChannels()[i]->source;
       srcCh.delay = wcet[applications->getChannels()[i]->source];
-      //srcCh.min_tok = sendbufferSz[i].min();
-      //srcCh.max_tok = sendbufferSz[i].max();
+      srcCh.min_tok = sendbufferSz[i];
+      srcCh.max_tok = sendbufferSz[i];
 
       //add to boost-msag
       boost_msag_des& curr_graph1 = *b_msags[msagId[block_actor]];
@@ -956,7 +1102,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
       dst = g.getVertex(applications->getChannels()[i]->source);    //b::vertex(ch_src[i], *b_msags[msagId[block_actor]]);
       b::tie(_e, found) = b::add_edge(src, dst, *b_msags[msagId[block_actor]]);
       b::put(b::edge_weight, curr_graph1, _e, wcet[applications->getChannels()[i]->source]);
-      //b::put(b::edge_weight2, curr_graph1, _e, sendbufferSz[i]);
+      b::put(b::edge_weight2, curr_graph1, _e, sendbufferSz[i]);
 
       n_msagChannels++;
       if(printDebug){
@@ -1088,8 +1234,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
       SuccessorNode succRec;
       succRec.successor_key = send_actor;
       succRec.delay = sendingTime[i];
-      //succRec.min_tok = recbufferSz[i].min() - tok[i];
-      //succRec.max_tok = recbufferSz[i].max() - tok[i];
+      succRec.min_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
+      succRec.max_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
       succRec.channel = i;
 
       //add to boost-msag
@@ -1098,7 +1244,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
       dst = g.getVertex(send_actor);   //b::vertex(send_actor, *b_msags[msagId[rec_actor]]);
       b::tie(_e, found) = b::add_edge(src, dst, curr_graph5);
       b::put(b::edge_weight, curr_graph5, _e, sendingTime[i]);
-      //b::put(b::edge_weight2, curr_graph5, _e, recbufferSz[i].max() - tok[i]);
+      b::put(b::edge_weight2, curr_graph5, _e, recbufferSz[i] - applications->getChannels()[i]->initTokens);
 
       n_msagChannels++;
       if(printDebug){
@@ -1406,4 +1552,44 @@ void Design::constructMSAG(vector<int> &msagMap) {
   if(printDebug){
     //printThroughputGraphAsDot(".");
   }
+}
+
+void Design::print_vector(vector<int> input)
+{
+    cout << "{";
+    for(auto i : input)
+        cout << i << ",";    
+    cout << "}\n";    
+}
+
+void Design::calc_energy()
+{
+    vector<int> sum_wcet_proc(no_processors, 0);
+    for(size_t i=0;i<no_actors;i++)
+    {
+        auto proc_id = proc_mappings[i];
+        sum_wcet_proc[proc_id] += wcet[i];
+    }
+    vector<int> utilizations(no_processors, 0);    
+    energy = 0; 
+    cout << "sum_wcet_proc="; print_vector(sum_wcet_proc);
+    //TODO: create the proc_period vector and use that for utilization calc.
+    for(size_t i=0;i<no_processors;i++)
+    {
+        if(periods[i] > 0)
+            utilizations[i] =  (mapping->max_utilization*sum_wcet_proc[i])/periods[i];  
+             
+        energy += utilizations[i] * mapping->getPlatform()->getPowerCons(i)[proc_modes[i]];     
+    }
+    
+}
+vector<int> Design::get_periods()
+{
+    calc_periods();
+    return periods;
+}
+int Design::get_energy()
+{
+    calc_energy();
+    return energy;
 }
