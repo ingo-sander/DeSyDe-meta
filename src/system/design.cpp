@@ -20,17 +20,7 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
     sendbufferSz(_sendbufferSz),
     recbufferSz(_recbufferSz)
     {
-        if(proc_mappings.size() != no_actors)
-           THROW_EXCEPTION(RuntimeException, "proc_mappings.size() != no_actors" );
-        if(proc_modes.size() != no_processors)
-           THROW_EXCEPTION(RuntimeException, "proc_modes.size() != no_processors" );
-       if(next.size() != no_actors + no_processors)
-           THROW_EXCEPTION(RuntimeException, "next.size() != no_actors + no_processors" );
-       if(sendingNext.size() != no_channels + no_processors)
-           THROW_EXCEPTION(RuntimeException, "no_channels + no_processors" );
-       if(receivingNext.size() != no_channels + no_processors)
-           THROW_EXCEPTION(RuntimeException, "no_channels + no_processors" );
-        
+        check_inputs();
         for(size_t ii=0; ii<no_actors-1; ii++){
             if(applications->getSDFGraph(ii)+1 == applications->getSDFGraph(ii+1)){
             appIndex.push_back(ii);
@@ -44,7 +34,53 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
         cout << "receivingTime:"; print_vector(receivingTime);
         cout << "wcet:"; print_vector(wcet);
     }
-
+Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc_mappings,
+               vector<int>_proc_modes, vector<int> _next, vector<int> _sendingNext, 
+               vector<int> _receivingNext, vector<int> _tdmaAlloc):
+    mapping(_mapping),
+    applications(_applications),
+    no_entities(mapping->getNumberOfApps()),
+    no_actors(applications->n_SDFActors()),
+    no_channels(applications->n_SDFchannels()),
+    no_processors(mapping->getPlatform()->nodes()),
+    proc_mappings(_proc_mappings),
+    proc_modes(_proc_modes),
+    next(_next),
+    sendingNext(_sendingNext),
+    receivingNext(_receivingNext),
+    tdmaAlloc(_tdmaAlloc)
+    {
+        check_inputs();
+        for(size_t ii=0; ii<no_actors-1; ii++){
+            if(applications->getSDFGraph(ii)+1 == applications->getSDFGraph(ii+1)){
+            appIndex.push_back(ii);
+            }
+        }
+        appIndex.push_back(no_actors-1);
+        sendbufferSz.resize(no_channels,10),
+        recbufferSz.resize(no_channels,1);
+        init_vectors();    
+        cout << "sendbufferSz:"; print_vector(sendbufferSz);
+        cout << "recbufferSz:"; print_vector(recbufferSz);
+        cout << "sendingTime:"; print_vector(sendingTime);
+        cout << "sendingLatency:"; print_vector(sendingLatency);
+        cout << "memCons:"; print_vector(memCons);
+        cout << "receivingTime:"; print_vector(receivingTime);
+        cout << "wcet:"; print_vector(wcet);
+    }    
+void Design::check_inputs()
+{
+   if(proc_mappings.size() != no_actors)
+       THROW_EXCEPTION(RuntimeException, "proc_mappings.size() != no_actors" );
+   if(proc_modes.size() != no_processors)
+       THROW_EXCEPTION(RuntimeException, "proc_modes.size() != no_processors" );
+   if(next.size() != no_actors + no_processors)
+       THROW_EXCEPTION(RuntimeException, "next.size() != no_actors + no_processors" );
+   if(sendingNext.size() != no_channels + no_processors)
+       THROW_EXCEPTION(RuntimeException, "no_channels + no_processors" );
+   if(receivingNext.size() != no_channels + no_processors)
+       THROW_EXCEPTION(RuntimeException, "no_channels + no_processors" );
+}
 void Design::constructMSAG() {
   cout << "\tDesign::constructMSAG()" << endl;
    bool printDebug = true;//TODO: remove prints
@@ -817,8 +853,6 @@ void Design::init_vectors(){
         int proc_src_i = proc_mappings[src_i];
         int proc_dest_i = proc_mappings[dest_i];    
         if(proc_src_i != proc_dest_i){
-             cout << "channel " << i << " has communications delays\n";
-             cout << "wctt: "; print_vector(mapping->wcTransferTimes(i));
              sendingTime.push_back(mapping->wcTransferTimes(i)[tdmaAlloc[proc_src_i]]);
              /// sendingLatency
              sendingLatency.push_back(mapping->wcBlockingTimes()[tdmaAlloc[proc_src_i]]);    
@@ -828,8 +862,10 @@ void Design::init_vectors(){
         }else{
             sendingTime.push_back(0);///zero sending time if on the same processor
             sendingLatency.push_back(0);
+            sendbufferSz[i] = 0; ///also no need for buffer
             /// memCons
             memCons[proc_src_i] += applications->getChannels()[i]->messageSize;
+            cout << "messageSize[" << i << "]=" << applications->getChannels()[i]->messageSize << endl;
         }
         ///(iv) receivingTime -> zero for TDMA-based platform
         receivingTime.push_back(0);    
@@ -1554,7 +1590,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
   }
 }
 
-void Design::print_vector(vector<int> input)
+void Design::print_vector(const vector<int> input)
 {
     cout << "{";
     for(auto i : input)
@@ -1572,16 +1608,22 @@ void Design::calc_energy()
     }
     vector<int> utilizations(no_processors, 0);    
     energy = 0; 
-    cout << "sum_wcet_proc="; print_vector(sum_wcet_proc);
-    //TODO: create the proc_period vector and use that for utilization calc.
+    /**
+     * Since applications mapped to the same processor have same periods,
+     * we can derive the processor periods as follows:
+     */ 
+    vector<int> proc_periods(no_processors, 0);
+    for(size_t i=0;i<no_actors;i++)
+    {
+        proc_periods[proc_mappings[i]] = periods[applications->getSDFGraph(i)];
+    }
     for(size_t i=0;i<no_processors;i++)
     {
-        if(periods[i] > 0)
-            utilizations[i] =  (mapping->max_utilization*sum_wcet_proc[i])/periods[i];  
+        if(proc_periods[i] > 0)
+            utilizations[i] =  ceil(((float)mapping->max_utilization*sum_wcet_proc[i])/proc_periods[i]);  
              
         energy += utilizations[i] * mapping->getPlatform()->getPowerCons(i)[proc_modes[i]];     
-    }
-    
+    }    
 }
 vector<int> Design::get_periods()
 {

@@ -74,16 +74,19 @@ class Design {
 public:
     Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>,
            vector<int>, vector<int>, vector<int>, vector<int>, vector<int>);    
+     Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>,
+           vector<int>, vector<int>, vector<int>);          
     ~Design(){};
     vector<int> get_periods();
     int get_energy();
+    void static print_vector(vector<int>);
 private:
     Mapping* mapping; /**< reference to the mapping class. */
     Applications* applications; /**< reference to the applications class. */
     const size_t no_entities; /**< total number of actors and tasks. */
-    size_t no_actors; /**< total number of actors and tasks. */
-    size_t no_channels; /**< total number of channels. */
-    size_t no_processors; /**< total number of processors. */
+    const size_t no_actors; /**< total number of actors and tasks. */
+    const size_t no_channels; /**< total number of channels. */
+    const size_t no_processors; /**< total number of processors. */
     vector<int> proc_mappings; /**< current mappings of entities (actors and tasks) to processors. */
     vector<int> proc_modes; /**< current processors modes. */
     vector<int> next; /**< current communication orders */
@@ -122,8 +125,8 @@ private:
      * (i) sendingTime, (ii) sendingLatency, (iii) receivingTime (iv) wcet (v) memCons
      */ 
     void init_vectors();
+    void check_inputs();/** validates the size of vectors. */
     void calc_periods();
     void calc_energy();
-    void print_vector(vector<int>);
     void printThroughputGraphAsDot(const string &dir) const;
 };
