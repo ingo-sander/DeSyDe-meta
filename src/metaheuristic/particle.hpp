@@ -35,6 +35,36 @@
 #include "../system/design.hpp"
 using namespace std;
 
+class Schedule{
+public:
+    Schedule(vector<int>, int);/** creates a random schedule out of input elements and dummy node. */
+    friend std::ostream& operator<< (std::ostream &out, const Schedule &sched);
+    void set_rank(int index, int value);
+    void set_rank(vector<int> _rank);
+    vector<int> get_rank();
+    vector<int> get_next();
+    vector<int> rank_diff(vector<int>);/** element-wise difference of rank and input vector. */
+    void rank_add(vector<float>);/** addes the rank with the input (speed). */
+    static int random_round(float);/** randomly slecets ceil or floor. */
+    int get_rank_by_id(int);
+    int get_next(int);
+    void switch_ranks(int, int);    
+    vector<int> get_elements();
+private:
+    vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
+    int dummy;/** id of dummy actor or dummy channel. */
+    /** 
+     * stores the position of the items in the sequence. 
+     * rank[i] is the position of elements[i]
+     */
+    vector<int> rank;
+    /**
+     * Repairs the schedules which violate the distinct constraint.
+     */ 
+    void repair_dist();    
+    int get_element_by_rank(int);
+};
+
 class Particle{
 public: 
     Particle(Mapping*, Applications*);
@@ -52,6 +82,9 @@ private:
     const size_t no_channels; /**< total number of channels. */
     const size_t no_processors; /**< total number of processors. */
     const size_t no_tdma_slots; /**< total number of TDMA slots. */
+    vector<shared_ptr<Schedule>> proc_sched;
+    vector<shared_ptr<Schedule>> send_sched;
+    vector<shared_ptr<Schedule>> rec_sched;
     vector<int> proc_mappings;
     vector<int> proc_modes;
     vector<int> next;
@@ -60,22 +93,11 @@ private:
     vector<int> tdmaAlloc;    
     vector<int> fitness;
     void init_random();
+    void repair_tdma();
+    void repair_proc_sched();
+    void repair();
+    vector<int> get_actors_by_proc(int);
+    vector<int> get_channel_by_src(int);
+    vector<int> get_channel_by_dst(int);
 };
 
-class Schedule{
-public:
-    Schedule(size_t);/** creates a random schedule with a given size. */
-    friend std::ostream& operator<< (std::ostream &out, const Schedule &sched);
-    void set_rank(int index, int value);
-    void set_rank(vector<int> _rank);
-    vector<int> get_rank();
-    vector<int> get_next();
-    vector<int> rank_diff(vector<int>);/** element-wise difference of rank and input vector. */
-    void rank_add(vector<float>);/** addes the rank with the input (speed). */
-    static int random_round(float);/** randomly slecets ceil or floor. */
-private:
-    vector<int> next;/** stores the sequence of items. */
-    vector<int> rank;/** stores the position of the items in the sequence. */
-    void update_next();/** updates the next vector based on the rank vector. */
-    
-};
