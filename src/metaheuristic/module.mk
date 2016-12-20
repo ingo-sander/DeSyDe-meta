@@ -28,7 +28,7 @@
 # MODULE PATH AND FILES
 #=======================
 
-CPP_FILES := particle.cpp 
+CPP_FILES := particle.cpp swarm.cpp
 
 
 
