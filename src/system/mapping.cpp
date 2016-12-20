@@ -65,8 +65,8 @@ Mapping::Mapping(Applications* p_program, Platform* p_target, XMLdoc& xml) {
   }*/
 
 Mapping::~Mapping() {
-  delete program;
-  delete target;
+  //delete program;
+  //delete target;
 }
 void Mapping::load_wcets(XMLdoc& xml)
 {
