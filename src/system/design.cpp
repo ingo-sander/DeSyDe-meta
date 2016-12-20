@@ -1,7 +1,7 @@
 #include "design.hpp"
 
 using namespace std;
-Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc_mappings,
+Design::Design(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _applications, vector<int> _proc_mappings,
                vector<int>_proc_modes, vector<int> _next, vector<int> _sendingNext, 
                vector<int> _receivingNext, vector<int> _tdmaAlloc, 
                vector<int>  _sendbufferSz, vector<int>  _recbufferSz):
@@ -28,13 +28,8 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
         }
         appIndex.push_back(no_actors-1);
         init_vectors();
-        cout << "sendingTime:"; print_vector(sendingTime);
-        cout << "sendingLatency:"; print_vector(sendingLatency);
-        cout << "memCons:"; print_vector(memCons);
-        cout << "receivingTime:"; print_vector(receivingTime);
-        cout << "wcet:"; print_vector(wcet);
     }
-Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc_mappings,
+Design::Design(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _applications, vector<int> _proc_mappings,
                vector<int>_proc_modes, vector<int> _next, vector<int> _sendingNext, 
                vector<int> _receivingNext, vector<int> _tdmaAlloc):
     mapping(_mapping),
@@ -60,13 +55,6 @@ Design::Design(Mapping* _mapping, Applications* _applications, vector<int> _proc
         sendbufferSz.resize(no_channels,10),
         recbufferSz.resize(no_channels,1);
         init_vectors();    
-        cout << "sendbufferSz:"; print_vector(sendbufferSz);
-        cout << "recbufferSz:"; print_vector(recbufferSz);
-        cout << "sendingTime:"; print_vector(sendingTime);
-        cout << "sendingLatency:"; print_vector(sendingLatency);
-        cout << "memCons:"; print_vector(memCons);
-        cout << "receivingTime:"; print_vector(receivingTime);
-        cout << "wcet:"; print_vector(wcet);
     }    
 void Design::check_inputs()
 {
@@ -82,8 +70,8 @@ void Design::check_inputs()
        THROW_EXCEPTION(RuntimeException, "no_channels + no_processors" );
 }
 void Design::constructMSAG() {
-  cout << "\tDesign::constructMSAG()" << endl;
-   bool printDebug = true;//TODO: remove prints
+  //cout << "\tDesign::constructMSAG()" << endl;
+   bool printDebug = false;//TODO: remove prints
   //first, figure out how many actors there will be in the MSAG, in order to
   //initialize channel-matrix and actor-vector for the state of SSE
   n_msagActors = no_actors;
@@ -812,9 +800,9 @@ void Design::calc_periods(){
     property_map<boost_msag_des, edge_weight2_t>::type ew2 = get(edge_weight2, b_msag);
     //do MCR analysis
     max_cr = maximum_cycle_ratio(b_msag, vim, ew1, ew2, &cc);
-    periods.push_back(max_cr);
+    periods[0] = max_cr;
 
-    //if(printDebug)
+    if(printDebug)
     {
       //if(next.assigned() && wcet.assigned())
       {
@@ -840,11 +828,7 @@ void Design::calc_periods(){
 
 void Design::init_vectors(){
     memCons.resize(no_processors,0);
-    wcet.resize(no_processors,0);
-    
-    for(auto map : proc_mappings)
-        cout << map << ", ";
-    cout << endl;
+    wcet.resize(no_actors,0);
     
     for(size_t i=0;i<no_channels;i++){
         /// sendingTime 
@@ -864,8 +848,7 @@ void Design::init_vectors(){
             sendingLatency.push_back(0);
             sendbufferSz[i] = 0; ///also no need for buffer
             /// memCons
-            memCons[proc_src_i] += applications->getChannels()[i]->messageSize;
-            cout << "messageSize[" << i << "]=" << applications->getChannels()[i]->messageSize << endl;
+            memCons[proc_src_i] += applications->getChannels()[i]->messageSize;            
         }
         ///(iv) receivingTime -> zero for TDMA-based platform
         receivingTime.push_back(0);    
@@ -877,6 +860,10 @@ void Design::init_vectors(){
                            mapping->memConsData(i, proc_i);
         ///(vi) wcet             
         wcet[i] = mapping->getWCET(i, proc_i, mode_i);
+        if(wcet[i] < 0)
+            THROW_EXCEPTION(RuntimeException, "wcet[i] < 0 actor"+
+                            tools::toString(i)+"proc:"+tools::toString(proc_i)
+                            +"mode:"+tools::toString(mode_i) );
     }
 }
 
@@ -1030,7 +1017,7 @@ struct myGraph {
 };
 
 void Design::constructMSAG(vector<int> &msagMap) {
-  bool printDebug = true;
+  bool printDebug = false;
   if(printDebug)
     cout << "\tThroughputMCR::constructMSAG(vector<int> &msagMap)" << endl;
 
@@ -1592,7 +1579,6 @@ void Design::constructMSAG(vector<int> &msagMap) {
 
 void Design::print_vector(const vector<int> input)
 {
-    cout << "{";
     for(auto i : input)
         cout << i << ",";    
     cout << "}\n";    
@@ -1628,10 +1614,76 @@ void Design::calc_energy()
 vector<int> Design::get_periods()
 {
     calc_periods();
+    /*if(periods[0] < 0)
+    {
+        cout << endl << endl << *this;
+        THROW_EXCEPTION(RuntimeException, "deadlock in the schedule" );
+    } 
+    */    
     return periods;
 }
 int Design::get_energy()
 {
     calc_energy();
     return energy;
+}
+std::ostream& operator<< (std::ostream &out, const Design &des)
+{
+    out << "proc_mappings:";
+    const string sep = ",";
+    for(auto m: des.proc_mappings)
+        out << m << sep;
+    out << endl;
+    
+    out << "proc_modes:";
+    for(auto m: des.proc_modes)
+        out << m << sep;
+    out << endl;
+        
+    out << "next:";
+    for(auto n: des.next)
+        out << n << sep;
+    out << endl;
+    
+    out << "sendingNext:";
+    for(auto s: des.sendingNext)
+        out << s << sep;
+    out << endl;
+    
+    out << "receivingNext:";
+    for(auto r: des.receivingNext)
+        out << r << sep;
+    out << endl;
+    
+    out << "tdmaAlloc:";
+    for(auto m: des.tdmaAlloc)
+        out << m << sep;
+    out << endl;
+    
+    out << "sendingLatency:";
+    for(auto l: des.sendingLatency)
+        out << l << sep;
+    out << endl;
+    
+    out << "receivingTime:";
+    for(auto m: des.receivingTime)
+        out << m << sep;
+    out << endl;
+    
+    out << "sendbufferSz:";
+    for(auto b: des.sendbufferSz)
+        out << b << sep;
+    out << endl;
+    
+    out << "recbufferSz:";
+    for(auto b: des.recbufferSz)
+        out << b << sep;
+    out << endl;
+    
+    out << "memCons:";
+    for(auto m: des.memCons)
+        out << m << sep;
+    out << endl;
+             
+    return out;
 }

@@ -72,17 +72,18 @@ class Design {
 
   };
 public:
-    Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>,
+    Design(shared_ptr<Mapping>, shared_ptr<Applications>, vector<int>, vector<int>, vector<int>,
            vector<int>, vector<int>, vector<int>, vector<int>, vector<int>);    
-     Design(Mapping*, Applications*, vector<int>, vector<int>, vector<int>,
+     Design(shared_ptr<Mapping>, shared_ptr<Applications>, vector<int>, vector<int>, vector<int>,
            vector<int>, vector<int>, vector<int>);          
     ~Design(){};
     vector<int> get_periods();
     int get_energy();
-    void static print_vector(vector<int>);
+    void static print_vector(const vector<int>);
+    friend std::ostream& operator<< (std::ostream &out, const Design &des);
 private:
-    Mapping* mapping; /**< reference to the mapping class. */
-    Applications* applications; /**< reference to the applications class. */
+    shared_ptr<Mapping> mapping; /**< reference to the mapping class. */
+    shared_ptr<Applications> applications; /**< reference to the applications class. */
     const size_t no_entities; /**< total number of actors and tasks. */
     const size_t no_actors; /**< total number of actors and tasks. */
     const size_t no_channels; /**< total number of channels. */
