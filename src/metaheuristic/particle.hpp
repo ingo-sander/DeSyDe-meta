@@ -46,10 +46,12 @@ public:
     vector<int> rank_diff(vector<int>);/** element-wise difference of rank and input vector. */
     void rank_add(vector<float>);/** addes the rank with the input (speed). */
     static int random_round(float);/** randomly slecets ceil or floor. */
-    int get_rank_by_id(int);
     int get_next(int);
     void switch_ranks(int, int);    
     vector<int> get_elements();
+    int get_element_by_rank(int);
+    int get_rank_by_id(int);
+    int get_rank_by_element(int);
 private:
     vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
     int dummy;/** id of dummy actor or dummy channel. */
@@ -62,21 +64,21 @@ private:
      * Repairs the schedules which violate the distinct constraint.
      */ 
     void repair_dist();    
-    int get_element_by_rank(int);
 };
 
 class Particle{
 public: 
-    Particle(Mapping*, Applications*);
+    Particle(shared_ptr<Mapping>, shared_ptr<Applications>);
     /** 
      * Returns the fitness value of the particle with respect to different objectives.
      */ 
     vector<int> get_fitness();
     vector<int> calc_fitness();
+    vector<int> get_next(vector<shared_ptr<Schedule>>, int);
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);
 private:    
-    Mapping* mapping;
-    Applications* applications;
+    shared_ptr<Mapping> mapping;
+    shared_ptr<Applications> applications;
     const size_t no_entities; /**< total number of actors and tasks. */
     const size_t no_actors; /**< total number of actors and tasks. */
     const size_t no_channels; /**< total number of channels. */
@@ -86,15 +88,16 @@ private:
     vector<shared_ptr<Schedule>> send_sched;
     vector<shared_ptr<Schedule>> rec_sched;
     vector<int> proc_mappings;
-    vector<int> proc_modes;
-    vector<int> next;
+    vector<int> proc_modes;    
     vector<int> sendNext;
     vector<int> recNext;
     vector<int> tdmaAlloc;    
     vector<int> fitness;
     void init_random();
     void repair_tdma();
-    void repair_proc_sched();
+    void repair_sched(vector<shared_ptr<Schedule>>, int);
+    void repair_send_sched(vector<shared_ptr<Schedule>>, int);
+    void repair_rec_sched(vector<shared_ptr<Schedule>>, int);    
     void repair();
     vector<int> get_actors_by_proc(int);
     vector<int> get_channel_by_src(int);
