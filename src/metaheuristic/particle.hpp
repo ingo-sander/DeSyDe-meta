@@ -49,9 +49,10 @@ public:
     int get_next(int);
     void switch_ranks(int, int);    
     vector<int> get_elements();
-    int get_element_by_rank(int);
-    int get_rank_by_id(int);
-    int get_rank_by_element(int);
+    int get_element_by_rank(int) const;
+    int get_rank_by_id(int) const;
+    int get_rank_by_element(int) const;
+    void set_rank_by_element(int, int);
 private:
     vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
     int dummy;/** id of dummy actor or dummy channel. */
@@ -65,7 +66,36 @@ private:
      */ 
     void repair_dist();    
 };
+struct Position{
+public:    
+    vector<shared_ptr<Schedule>> proc_sched;
+    vector<shared_ptr<Schedule>> send_sched;
+    vector<shared_ptr<Schedule>> rec_sched;
+    vector<int> proc_mappings;
+    vector<int> proc_modes;        
+    vector<int> tdmaAlloc;     
+    vector<int> get_actors_by_proc(int) const;    
+    vector<int> fitness;
+    friend std::ostream& operator<< (std::ostream &out, const Position &p);
+    
+    /*Position& operator=(const Position& p)
+    {
+        proc_mappings = p.proc_mappings;
+        return *this;
+    }*/
 
+ 
+    bool empty() const
+    {
+        return fitness.empty();
+    }
+    static int weighted_sum(int a, int b, float w) 
+    {
+        float diff = w*(b - a);
+        return Schedule::random_round((float) a + diff);
+    }
+  
+};
 class Particle{
 public: 
     Particle(shared_ptr<Mapping>, shared_ptr<Applications>);
@@ -73,8 +103,12 @@ public:
      * Returns the fitness value of the particle with respect to different objectives.
      */ 
     vector<int> get_fitness();
-    vector<int> calc_fitness();
+    void calc_fitness();
     vector<int> get_next(vector<shared_ptr<Schedule>>, int);
+    void set_best_global(Position);
+    Position get_current_position();
+    Position get_best_local_position();
+    void update_position();/** updates the current position based on the local best and global best.*/
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);
 private:    
     shared_ptr<Mapping> mapping;
@@ -84,23 +118,25 @@ private:
     const size_t no_channels; /**< total number of channels. */
     const size_t no_processors; /**< total number of processors. */
     const size_t no_tdma_slots; /**< total number of TDMA slots. */
-    vector<shared_ptr<Schedule>> proc_sched;
-    vector<shared_ptr<Schedule>> send_sched;
-    vector<shared_ptr<Schedule>> rec_sched;
-    vector<int> proc_mappings;
-    vector<int> proc_modes;    
-    vector<int> sendNext;
-    vector<int> recNext;
-    vector<int> tdmaAlloc;    
-    vector<int> fitness;
+    Position current_position;
+    Position best_local_position;
+    Position best_global_position;
     void init_random();
-    void repair_tdma();
-    void repair_sched(vector<shared_ptr<Schedule>>, int);
-    void repair_send_sched(vector<shared_ptr<Schedule>>, int);
-    void repair_rec_sched(vector<shared_ptr<Schedule>>, int);    
-    void repair();
-    vector<int> get_actors_by_proc(int);
-    vector<int> get_channel_by_src(int);
-    vector<int> get_channel_by_dst(int);
+    void build_schedules(Position&);/** builds proc_sched, send_sched and rec_sched based on the mappings.*/        
+    void repair_tdma(Position&);
+    void repair_sched(Position&);
+    void repair_send_sched(Position&);
+    void repair_rec_sched(Position&);    
+    void repair(Position&);
+    vector<int> get_channel_by_src(Position&, int) const;
+    vector<int> get_channel_by_dst(Position&, int) const;    
+    /**
+     * Adds position p2 to p1.
+     * Uses the weight in adding.
+     */ 
+    void add_positions(Position& p1, const Position& p2, float w) ;
+    bool is_better_than_lb(vector<int> f);
+    int bring_to_bound(int, int, int);
+    vector<int> bring_v_to_bound(vector<int>, int, int);
 };
 

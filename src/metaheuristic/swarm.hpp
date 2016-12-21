@@ -45,7 +45,10 @@ private:
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
     vector<shared_ptr<Particle>> particle_set;
-    shared_ptr<Particle> best_particle;
+    Position best_position;
     const size_t no_particles; /**< total number of particles. */
+    const size_t no_generations; /**< total number of particles. */
+    
+    bool is_particle_better_gb(Position p);
 };
 
