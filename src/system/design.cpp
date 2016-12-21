@@ -663,7 +663,7 @@ void Design::calc_periods(){
     periods.clear();
     periods.resize(applications->n_SDFApps(), 0);
     vector<int> msagMap(applications->n_SDFApps(), 0);
-    bool printDebug = true;
+    bool printDebug = false;
     
     if(applications->n_SDFApps() > 1){
     //check which application graphs are mapped to same processor (= combined into the same MSAG)
