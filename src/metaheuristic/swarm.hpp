@@ -35,20 +35,36 @@
 #include "particle.hpp"
 using namespace std;
 
-
+struct ParetoFront
+{
+    ParetoFront(int no_obj);
+    vector<Position> pareto;
+    /**
+     * returns true if the input position dominates the current position
+     * with respect to objective obj.
+     */ 
+    bool dominate(Position&, int);
+    /**
+     * Compares the input position with the current front 
+     * and replaces if it dominates
+     */ 
+    void update_pareto(Position);
+    friend std::ostream& operator<< (std::ostream &out, const ParetoFront &p);
+};
 class Swarm{
 public: 
     Swarm(shared_ptr<Mapping>, shared_ptr<Applications>);
+    ~Swarm();
     void search();
     friend std::ostream& operator<< (std::ostream &out, const Swarm &swarm);
 private:    
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
     vector<shared_ptr<Particle>> particle_set;
-    Position best_position;
+    const size_t no_objectives; /**< total number of objectives. */
     const size_t no_particles; /**< total number of particles. */
     const size_t no_generations; /**< total number of particles. */
-    
-    bool is_particle_better_gb(Position p);
+    ParetoFront pareto;
+    int random_obj();/** returns a random objective. */
 };
 

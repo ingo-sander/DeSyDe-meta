@@ -2,14 +2,20 @@
 Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application):
                     mapping(_mapping),
                     applications(_application),
-                    no_particles(30),
-                    no_generations(50)
+                    no_objectives(mapping->getNumberOfApps()+1),
+                    no_particles(20),
+                    no_generations(100),
+                    pareto(no_objectives)                    
 {   
     for(size_t i=0;i<no_particles;i++)
     {
         shared_ptr<Particle> p(new Particle(mapping, applications));
         particle_set.push_back(p);
-    }
+    }    
+}
+Swarm::~Swarm()
+{
+    particle_set.clear();
 }
 void Swarm::search()
 {
@@ -24,15 +30,10 @@ void Swarm::search()
         ///Find the best particle
         for(auto p: particle_set)
         {
-            if(is_particle_better_gb(p->get_current_position()))
-            {
-                best_position = p->get_current_position();
-            }
+            pareto.update_pareto(p->get_current_position());
         }
-        cout << "best fitness: ";
-        for(auto f : best_position.fitness)
-            cout << f << " ";
-        cout << endl;  
+        cout << "pareto front--------------------------\n"
+             << pareto << endl;  
         
         if(g+1 < no_generations)        
         {
@@ -40,51 +41,62 @@ void Swarm::search()
             /// update the positions
             for(auto p: particle_set)
             {
-                p->set_best_global(best_position);
-                p->update_position();
+                int obj = random_obj();
+                if(!pareto.pareto[obj].empty())
+                {
+                    p->set_best_global(pareto.pareto[obj]);
+                    p->update_position();
+                }
             }
         }        
-    }
-    
-    cout << "best position:" << best_position << endl;
-   
-    cout << endl;    
+    }    
 }
 std::ostream& operator<< (std::ostream &out, const Swarm &swarm)
 {
     out << "no particles=" << swarm.no_particles << endl;
     return out;
 }
-bool Swarm::is_particle_better_gb(Position p)
+int Swarm::random_obj()
 {
-
-    vector<int> fitness = p.fitness;
-    if(best_position.empty() && fitness[0] > 0)
-        {return true;}
-    if(best_position.empty() && fitness[0] < 0)
+    random_device rnd_device;
+    uniform_int_distribution<int> dist(0, no_objectives-1);
+    mt19937 mersenne_engine(rnd_device());  
+    auto gen = std::bind(dist, mersenne_engine);
+    int obj = gen();
+    return obj;    
+}
+ParetoFront::ParetoFront(int no_obj)
+{
+    for(int i=0;i<no_obj;i++)
+        pareto.push_back(Position());
+}
+std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
+{
+    for(auto po : p.pareto)
+        out << Particle::print_vector(out, po.fitness) << endl;
+    return out;    
+}
+bool ParetoFront::dominate(Position& p, int obj)
+{
+    if(p.empty() || p.fitness[obj] <= 0)
         return false;
         
-    vector<int> best_fitness = best_position.fitness;
-        
-    if(fitness[0] < 0) ///There is a deadlock
-        return false;
+    if(pareto[obj].empty() && !p.empty() && p.fitness[obj] > 0)
+        return true;    
     
-    bool better_pr = true;
-    bool better_eng = true;
-    for(int i=0;i<mapping->getNumberOfApps();i++)
+    if(pareto[obj].fitness[obj] > p.fitness[obj])
+        return true;
+    else
+        return false;        
+}
+void ParetoFront::update_pareto(Position p)
+{
+    for(size_t obj=0;obj<pareto.size();obj++)
     {
-        if(fitness[i] > best_fitness[i])
+        if(dominate(p, obj))
         {
-            better_pr = false;
-            break;
+            pareto[obj] = p;
         }
     }
-    if(fitness[fitness.size()-1] > best_fitness[best_fitness.size()-1])
-    {
-        //better_eng = false;
-    }
-    if(better_pr && better_eng)
-        {return true;}
-    else    
-        return false;
 }
+
