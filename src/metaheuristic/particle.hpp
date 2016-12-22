@@ -53,6 +53,18 @@ public:
     int get_rank_by_id(int) const;
     int get_rank_by_element(int) const;
     void set_rank_by_element(int, int);
+    Schedule& operator=(const Schedule& s)
+    {
+        rank = s.rank;
+        dummy = s.dummy;
+        elements= s.elements;
+        return *this;
+    }
+    ~Schedule()
+    {
+        rank.clear();
+        elements.clear();
+    }
 private:
     vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
     int dummy;/** id of dummy actor or dummy channel. */
@@ -68,9 +80,15 @@ private:
 };
 struct Position{
 public:    
-    vector<shared_ptr<Schedule>> proc_sched;
-    vector<shared_ptr<Schedule>> send_sched;
-    vector<shared_ptr<Schedule>> rec_sched;
+   ~Position()
+    {
+        proc_sched.clear();
+        send_sched.clear();
+        rec_sched.clear();            
+    }
+    vector<Schedule> proc_sched;
+    vector<Schedule> send_sched;
+    vector<Schedule> rec_sched;
     vector<int> proc_mappings;
     vector<int> proc_modes;        
     vector<int> tdmaAlloc;     
@@ -78,11 +96,23 @@ public:
     vector<int> fitness;
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
-    /*Position& operator=(const Position& p)
+    Position& operator=(const Position& p)
     {
         proc_mappings = p.proc_mappings;
+        proc_modes = p.proc_modes;
+        tdmaAlloc = p.tdmaAlloc;
+        fitness = p.fitness;
+        proc_sched.clear();
+        send_sched.clear();
+        rec_sched.clear();
+        for(auto s: p.proc_sched)
+            proc_sched.push_back(std::move(s));
+        for(auto s: p.send_sched)
+            send_sched.push_back(std::move(s));
+        for(auto s: p.rec_sched)
+            rec_sched.push_back(std::move(s));               
         return *this;
-    }*/
+    }
 
  
     bool empty() const
@@ -94,6 +124,7 @@ public:
         float diff = w*(b - a);
         return Schedule::random_round((float) a + diff);
     }
+ 
   
 };
 class Particle{
@@ -104,12 +135,13 @@ public:
      */ 
     vector<int> get_fitness();
     void calc_fitness();
-    vector<int> get_next(vector<shared_ptr<Schedule>>, int);
+    vector<int> get_next(vector<Schedule>, int);
     void set_best_global(Position);
     Position get_current_position();
     Position get_best_local_position();
     void update_position();/** updates the current position based on the local best and global best.*/
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);
+    static std::ostream& print_vector (std::ostream &out, const vector<int> &v) ;
 private:    
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;

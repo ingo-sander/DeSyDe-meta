@@ -20,16 +20,16 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
 }
 void Particle::build_schedules(Position& p)
 {
+    p.proc_sched.clear();
+    p.send_sched.clear();
+    p.rec_sched.clear();
     for(size_t i=0;i<no_processors;i++)
     {
-        shared_ptr<Schedule> s(new Schedule(p.get_actors_by_proc(i), i+no_actors));
-        p.proc_sched.push_back(s);
+        p.proc_sched.push_back(Schedule(p.get_actors_by_proc(i), i+no_actors));
         
-        shared_ptr<Schedule> snd(new Schedule(get_channel_by_src(p, i), i+no_channels));
-        p.send_sched.push_back(snd);
+        p.send_sched.push_back(Schedule(get_channel_by_src(p, i), i+no_channels));
         
-        shared_ptr<Schedule> rc(new Schedule(get_channel_by_dst(p, i), i+no_channels));
-        p.rec_sched.push_back(rc);
+        p.rec_sched.push_back(Schedule(get_channel_by_dst(p, i), i+no_channels));
     }
 }
 void Particle::repair(Position &p)
@@ -49,21 +49,21 @@ void Particle::repair_sched(Position& p)
 {
     for(size_t proc=0;proc<p.proc_sched.size();proc++)
     {
-        p.proc_sched[proc]->set_rank( bring_v_to_bound(p.proc_sched[proc]->get_rank(), 0, p.proc_sched[proc]->get_rank().size()-1) );        
-        for(size_t i=0;i<p.proc_sched[proc]->get_elements().size();i++)
+        p.proc_sched[proc].set_rank( bring_v_to_bound(p.proc_sched[proc].get_rank(), 0, p.proc_sched[proc].get_rank().size()-1) );        
+        for(size_t i=0;i<p.proc_sched[proc].get_elements().size();i++)
         {
-            int a = p.proc_sched[proc]->get_elements()[i];
-            for(size_t j=i;j<p.proc_sched[proc]->get_elements().size();j++)
+            int a = p.proc_sched[proc].get_elements()[i];
+            for(size_t j=i;j<p.proc_sched[proc].get_elements().size();j++)
             {                
-                int b = p.proc_sched[proc]->get_elements()[j];
-                int rank_a = p.proc_sched[proc]->get_rank_by_id(i);
-                int rank_b = p.proc_sched[proc]->get_rank_by_id(j);
+                int b = p.proc_sched[proc].get_elements()[j];
+                int rank_a = p.proc_sched[proc].get_rank_by_id(i);
+                int rank_b = p.proc_sched[proc].get_rank_by_id(j);
                 /**
                  * if a and b are not dummy and the dependency is violated
                  */ 
                 if((a < (int) no_actors && b < (int) no_actors) && rank_a > rank_b && applications->dependsOn(a, b))
                 {
-                    p.proc_sched[proc]->switch_ranks(i, j);
+                    p.proc_sched[proc].switch_ranks(i, j);
                     LOG_DEBUG("switching " + tools::toString(a) +
                               " and " + tools::toString(b));
                 }
@@ -76,23 +76,23 @@ void Particle::repair_send_sched(Position& p)
 {
     for(size_t proc=0;proc<p.send_sched.size();proc++)
     {
-        p.send_sched[proc]->set_rank( bring_v_to_bound(p.send_sched[proc]->get_rank(), 0, p.send_sched[proc]->get_rank().size()-1) );
-        for(size_t i=0;i<p.send_sched[proc]->get_elements().size();i++)
+        p.send_sched[proc].set_rank( bring_v_to_bound(p.send_sched[proc].get_rank(), 0, p.send_sched[proc].get_rank().size()-1) );
+        for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
         {
-            int a = p.send_sched[proc]->get_elements()[i];
-            for(size_t j=0;j<p.send_sched[proc]->get_elements().size();j++)
+            int a = p.send_sched[proc].get_elements()[i];
+            for(size_t j=0;j<p.send_sched[proc].get_elements().size();j++)
             {                
-                int b = p.send_sched[proc]->get_elements()[j];
+                int b = p.send_sched[proc].get_elements()[j];
                 if(a < (int) no_channels && b < (int) no_channels)
                 {
-                    int dst_b = applications->getChannels()[b]->destination;
-                    int dst_a = applications->getChannels()[a]->destination;
-                    int src_b = applications->getChannels()[b]->source;
-                    int src_a = applications->getChannels()[a]->source;
-                    int rank_a = p.send_sched[proc]->get_rank_by_id(i);
-                    int rank_b = p.send_sched[proc]->get_rank_by_id(j);
-                    int rank_src_a = p.proc_sched[p.proc_mappings[src_a]]->get_rank_by_element(src_a);
-                    int rank_src_b = p.proc_sched[p.proc_mappings[src_b]]->get_rank_by_element(src_b);
+                    int dst_b = applications->getChannel(b)->destination;
+                    int dst_a = applications->getChannel(a)->destination;
+                    int src_b = applications->getChannel(b)->source;
+                    int src_a = applications->getChannel(a)->source;
+                    int rank_a = p.send_sched[proc].get_rank_by_id(i);
+                    int rank_b = p.send_sched[proc].get_rank_by_id(j);
+                    int rank_src_a = p.proc_sched[p.proc_mappings[src_a]].get_rank_by_element(src_a);
+                    int rank_src_b = p.proc_sched[p.proc_mappings[src_b]].get_rank_by_element(src_b);
                     /**
                      * if a and b are sending to the same destination
                      * and the dependency is violated
@@ -107,7 +107,7 @@ void Particle::repair_send_sched(Position& p)
                        (rank_src_a < rank_src_b && rank_a > rank_b) 
                       )
                     {
-                        p.send_sched[proc]->switch_ranks(i, j);
+                        p.send_sched[proc].switch_ranks(i, j);
                         LOG_DEBUG("switching send_next " + tools::toString(a) +
                                   " and " + tools::toString(b));
                     }
@@ -125,27 +125,27 @@ void Particle::repair_rec_sched(Position& p)
      */ 
     for(size_t proc=0;proc<p.rec_sched.size();proc++)
     {
-        p.rec_sched[proc]->set_rank( bring_v_to_bound(p.rec_sched[proc]->get_rank(), 0, p.rec_sched[proc]->get_rank().size()-1) );
-        for(size_t i=0;i<p.rec_sched[proc]->get_elements().size();i++)
+        p.rec_sched[proc].set_rank( bring_v_to_bound(p.rec_sched[proc].get_rank(), 0, p.rec_sched[proc].get_rank().size()-1) );
+        for(size_t i=0;i<p.rec_sched[proc].get_elements().size();i++)
         {
-            int a = p.rec_sched[proc]->get_elements()[i];
-            for(size_t j=0;j<p.rec_sched[proc]->get_elements().size();j++)
+            int a = p.rec_sched[proc].get_elements()[i];
+            for(size_t j=0;j<p.rec_sched[proc].get_elements().size();j++)
             {                
-                int b = p.rec_sched[proc]->get_elements()[j];
+                int b = p.rec_sched[proc].get_elements()[j];
                 if(a < (int) no_channels && b < (int) no_channels)
                 {
-                    int src_b = applications->getChannels()[b]->source;
-                    int src_a = applications->getChannels()[a]->source;
+                    int src_b = applications->getChannel(b)->source;
+                    int src_a = applications->getChannel(a)->source;
                     if(p.proc_mappings[src_a] == p.proc_mappings[src_b])
                     {
-                        int rank_src_a = p.send_sched[p.proc_mappings[src_a]]->get_rank_by_element(a);
-                        int rank_src_b = p.send_sched[p.proc_mappings[src_b]]->get_rank_by_element(b);       
-                        int rank_a = p.rec_sched[proc]->get_rank_by_id(i);
-                        int rank_b = p.rec_sched[proc]->get_rank_by_id(j);            
+                        int rank_src_a = p.send_sched[p.proc_mappings[src_a]].get_rank_by_element(a);
+                        int rank_src_b = p.send_sched[p.proc_mappings[src_b]].get_rank_by_element(b);       
+                        int rank_a = p.rec_sched[proc].get_rank_by_id(i);
+                        int rank_b = p.rec_sched[proc].get_rank_by_id(j);            
                     
                         if(rank_src_a < rank_src_b && rank_a > rank_b)
                         {
-                            p.rec_sched[proc]->switch_ranks(i, j);
+                            p.rec_sched[proc].switch_ranks(i, j);
                             LOG_DEBUG("switching rec_next " + tools::toString(a) +
                                       " and " + tools::toString(b));
                         }
@@ -171,7 +171,7 @@ vector<int> Particle::get_channel_by_src(Position& p, int src_proc_id) const
     vector<int> channels;
     for(size_t i=0;i<no_channels;i++)
     {
-        if(p.proc_mappings[applications->getChannels()[i]->source] == src_proc_id)
+        if(p.proc_mappings[applications->getChannel(i)->source] == src_proc_id)
             channels.push_back(i);
     }
     return channels;
@@ -181,7 +181,7 @@ vector<int> Particle::get_channel_by_dst(Position& p, int dst_proc_id) const
     vector<int> channels;
     for(size_t i=0;i<no_channels;i++)
     {
-        if(p.proc_mappings[applications->getChannels()[i]->destination] == dst_proc_id)
+        if(p.proc_mappings[applications->getChannel(i)->destination] == dst_proc_id)
             channels.push_back(i);
     }
     return channels;
@@ -222,8 +222,8 @@ void Particle::repair_tdma(Position& p)
     ///Random # tdma slots based on src and dst of channels
     for(size_t i=0;i<no_channels;i++)
     {
-        int src_i = applications->getChannels()[i]->source;
-        int dest_i = applications->getChannels()[i]->destination;
+        int src_i = applications->getChannel(i)->source;
+        int dest_i = applications->getChannel(i)->destination;
         int proc_src_i = p.proc_mappings[src_i];
         int proc_dest_i = p.proc_mappings[dest_i];    
         if(proc_src_i != proc_dest_i)
@@ -264,17 +264,17 @@ void Particle::repair_tdma(Position& p)
         }
     }
 }
-vector<int> Particle::get_next(vector<shared_ptr<Schedule>> sched_set, int no_elements)
+vector<int> Particle::get_next(vector<Schedule> sched_set, int no_elements)
 {
     vector<int> next(no_elements+no_processors, 0);
     vector<int> low_ranks;
     for (auto s : sched_set)
     {
-        for(auto e: s->get_elements())
+        for(auto e: s.get_elements())
         {
-            next[e] = s->get_next(e);
+            next[e] = s.get_next(e);
         }
-        low_ranks.push_back(s->get_element_by_rank(0));                    
+        low_ranks.push_back(s.get_element_by_rank(0));                    
     }
     ///Last dummy node should point to the highest rank of the first proc
     next[no_elements+no_processors-1] = low_ranks[0];
@@ -287,23 +287,22 @@ vector<int> Particle::get_next(vector<shared_ptr<Schedule>> sched_set, int no_el
 void Particle::calc_fitness()
 {   
     try{ 
-    Design design(mapping, applications, current_position.proc_mappings, 
-                  current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
-                  get_next(current_position.send_sched, no_channels),
-                  get_next(current_position.rec_sched, no_channels), 
-                  current_position.tdmaAlloc);
-    
-    vector<int> prs = design.get_periods();
-  
-
-    current_position.fitness.clear();
-    current_position.fitness.resize(no_entities + 1,0);
-    int eng = design.get_energy();
-    for(size_t i=0;i< prs.size();i++)
-        current_position.fitness[i] = prs[i];
+        Design design(mapping, applications, current_position.proc_mappings, 
+                      current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
+                      get_next(current_position.send_sched, no_channels),
+                      get_next(current_position.rec_sched, no_channels), 
+                      current_position.tdmaAlloc);
         
-    current_position.fitness[current_position.fitness.size()-1] = eng;
+        vector<int> prs = design.get_periods();
       
+
+        current_position.fitness.clear();
+        current_position.fitness.resize(no_entities + 1,0);
+        int eng = design.get_energy();
+        for(size_t i=0;i< prs.size();i++)
+            current_position.fitness[i] = prs[i];
+            
+        current_position.fitness[current_position.fitness.size()-1] = eng;        
     }
     catch(std::exception const& e)
     {
@@ -311,9 +310,11 @@ void Particle::calc_fitness()
         THROW_EXCEPTION(RuntimeException, e.what() );
     }
     if(is_better_than_lb(current_position.fitness))
-    {        
+    {   
+        //best_local_position.~Position();
         best_local_position = current_position;
-    }      
+    }    
+    
 }
 vector<int> Particle::get_fitness()
 {
@@ -321,6 +322,7 @@ vector<int> Particle::get_fitness()
 }
 void Particle::set_best_global(Position p)
 {
+    //best_global_position.~Position();
     best_global_position = p;
 }
 Position Particle::get_current_position()
@@ -332,9 +334,7 @@ Position Particle::get_best_local_position()
     return best_local_position;
 }
 void Particle::update_position()
-{
-    //cout << current_position;
-    
+{   
     if(!best_global_position.empty())
         add_positions(current_position, best_global_position, .5);
     
@@ -342,9 +342,6 @@ void Particle::update_position()
         add_positions(current_position, best_local_position, .5);
  
     repair(current_position);    
-    
-    //cout << current_position;
-    //THROW_EXCEPTION(RuntimeException, "update position" );
 }
 
 void Particle::add_positions(Position& p1, const Position& p2, float w) 
@@ -380,14 +377,14 @@ void Particle::add_positions(Position& p1, const Position& p2, float w)
         for(size_t proc;proc<p1.proc_sched.size();proc++)
         {
             ///go through all elemennts in this proc
-            for(auto e : p1.proc_sched[proc]->get_elements())
+            for(auto e : p1.proc_sched[proc].get_elements())
             {
-                new_p.proc_sched[new_p.proc_mappings[e]]->set_rank_by_element(e, 
-                        Position::weighted_sum(p1.proc_sched[proc]->get_rank_by_element(e),
-                                     p2.proc_sched[p2.proc_mappings[e]]->get_rank_by_element(e), w) );
+                new_p.proc_sched[new_p.proc_mappings[e]].set_rank_by_element(e, 
+                        Position::weighted_sum(p1.proc_sched[proc].get_rank_by_element(e),
+                                     p2.proc_sched[p2.proc_mappings[e]].get_rank_by_element(e), w) );
             }
-        }
-        p1 = new_p;
+        }        
+        p1 = new_p;                
     }
     catch(std::exception const& e)
     {
@@ -457,13 +454,13 @@ std::ostream& operator<< (std::ostream &out, const Position &p)
         out << t << " ";
     out << endl << "proc_sched -----";    
     for(auto s : p.proc_sched)
-        out << *s;
+        out << s;
     out << endl << "send_sched -----";        
     for(auto s : p.send_sched)
-        out << *s;
+        out << s;
     out << endl << "rec_sched -----";        
     for(auto r : p.rec_sched)
-        out << *r << " ";    
+        out << r << " ";    
     out << endl << "fitness -----";        
     for(auto f : p.fitness)
         out << f << " ";                
@@ -639,4 +636,15 @@ void Schedule::repair_dist()
                         
         }
     }
+}
+std::ostream& Particle::print_vector (std::ostream &out, const vector<int> &v)
+{
+    if(v.empty())
+        return out << "{}";
+        
+    out << "{";
+    for(size_t i=0;i<v.size()-1;i++)
+        out << v[i] << ",";
+    out << v[v.size()-1] << "}";
+    return out;    
 }
