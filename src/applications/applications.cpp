@@ -30,7 +30,7 @@ Applications::Applications(vector<SDFGraph*> _sdfApps, TaskSet* _iptApps, XMLdoc
   }
   
   n_iptTasks = iptApps->getNumberOfTasks();
-  
+  all_channels = getChannels();
   load_const(xml);
 }
 void Applications::load_const(XMLdoc& xml)
@@ -77,6 +77,7 @@ Applications::Applications(vector<SDFGraph*> _sdfApps, vector<DesignConstraints*
   }
   
   n_iptTasks = iptApps->getNumberOfTasks();
+  all_channels = getChannels();
   }
 
 Applications::Applications(vector<SDFGraph*> _sdfApps, vector<DesignConstraints*> _desContr)
@@ -441,6 +442,11 @@ vector<SDFChannel*> Applications::getChannels(int appId){
   return channels;
 }
 
+SDFChannel* Applications::getChannel(int ch_id){
+  if(ch_id >= (int) all_channels.size())
+    THROW_EXCEPTION(RuntimeException, "channel id out of bound!" );
+  return all_channels[ch_id];
+}
 //get the list of channels in all programs
 vector<SDFChannel*> Applications::getChannels(){
   vector<SDFChannel*> channels;

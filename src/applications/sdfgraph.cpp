@@ -669,6 +669,9 @@ vector<SDFChannel*> SDFGraph::getChannels() const{
   return channels;  
 }
 
+SDFChannel* SDFGraph::getChannel(int ch_id) const{
+  return channels[ch_id];  
+}
 //get the list of direct predecessors of actor id
 vector<SDFActor*> SDFGraph::getPredecessors(int p_actor) const{
   vector<SDFActor*> pred;

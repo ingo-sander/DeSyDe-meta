@@ -53,6 +53,8 @@ protected:
   size_t n_sdfParentActors;
   size_t n_sdfChannels;
   size_t n_iptTasks;
+  
+  vector<SDFChannel*> all_channels;/** pointer to all channels of all sdf apps. */
 
 public:
   Applications();
@@ -146,6 +148,8 @@ public:
   vector<SDFChannel*> getChannels(int appId);
   //get the list of channels in all applications 
   vector<SDFChannel*> getChannels();
+  //get pointer to specific channel
+  SDFChannel* getChannel(int ch_id);
   //get the token size on channel id
   size_t getTokenSize(size_t id);
   //get the number of initial tokens on a channel from src to dst

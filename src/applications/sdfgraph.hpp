@@ -318,7 +318,11 @@ public:
    * @returns List of channels.
    */
   vector<SDFChannel*> getChannels() const;
-  
+  /**
+   * Gives the channel with a given id.
+   * @returns pointer to the channel.
+   */
+  SDFChannel* getChannel(int ch_id) const;  
   /**
    * Gives a list of all direct predecessor of the specified actor.
    * A direct predecessor is the source of a channel connected to 
