@@ -76,7 +76,11 @@ public:
            vector<int>, vector<int>, vector<int>, vector<int>, vector<int>);    
      Design(shared_ptr<Mapping>, shared_ptr<Applications>, vector<int>, vector<int>, vector<int>,
            vector<int>, vector<int>, vector<int>);          
-    ~Design(){};
+    ~Design()
+    {
+        for(auto g : b_msags)
+            delete g;
+    };
     vector<int> get_periods();
     int get_energy();
     void static print_vector(const vector<int>);
