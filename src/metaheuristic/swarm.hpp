@@ -30,6 +30,8 @@
 #include <iterator>
 #include <iostream>
 #include <functional>
+#include <thread>
+#include <chrono>
 
 #include "../exceptions/runtimeexception.h"
 #include "particle.hpp"
@@ -64,7 +66,13 @@ private:
     const size_t no_objectives; /**< total number of objectives. */
     const size_t no_particles; /**< total number of particles. */
     const size_t no_generations; /**< total number of particles. */
+    const int no_threads;
+    int particle_per_thread;
     ParetoFront pareto;
+    typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
+    runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
     int random_obj();/** returns a random objective. */
+    void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
+    void update_position(int);/** updates the best position of particles in a thread. */ 
 };
 
