@@ -132,7 +132,7 @@ void Design::constructMSAG() {
 
       //add to boost-msag
       //src = b::vertex(ch_src[i], b_msag);
-      src = b::vertex(applications->getChannels()[i]->source, b_msag);
+      src = b::vertex(applications->getChannel(i)->source, b_msag);
       dst = b::vertex(block_actor, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, sendingLatency[i]);
@@ -144,28 +144,28 @@ void Design::constructMSAG() {
       n_msagChannels++;
       if(printDebug)
       {
-        unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannels()[i]->source);
+        unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannel(i)->source);
         if(it != msaGraph.end()){    //i already has an entry in the map
-          msaGraph.at(applications->getChannels()[i]->source).push_back(succB);
+          msaGraph.at(applications->getChannel(i)->source).push_back(succB);
         }else{      //no entry for ch_src[i] yet
           vector<SuccessorNode> succBv;
           succBv.push_back(succB);
-          msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannels()[i]->source, succBv));
+          msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannel(i)->source, succBv));
         }
       }
 
       //add ch_src[i] as successor of the block actor, with buffer size as tokens
       SuccessorNode srcCh;
-      srcCh.successor_key = applications->getChannels()[i]->source;
-      srcCh.delay = wcet[applications->getChannels()[i]->source];
+      srcCh.successor_key = applications->getChannel(i)->source;
+      srcCh.delay = wcet[applications->getChannel(i)->source];
       srcCh.min_tok = sendbufferSz[i];
       srcCh.max_tok = sendbufferSz[i];
 
       //add to boost-msag
       src = b::vertex(block_actor, b_msag);
-      dst = b::vertex(applications->getChannels()[i]->source, b_msag);
+      dst = b::vertex(applications->getChannel(i)->source, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
-      b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannels()[i]->source]);
+      b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannel(i)->source]);
       b::put(b::edge_weight2, b_msag, _e, sendbufferSz[i]);
 
       n_msagChannels++;
@@ -242,8 +242,8 @@ void Design::constructMSAG() {
       SuccessorNode dstCh;
       dstCh.successor_key = rec_actor;
       dstCh.delay = receivingTime[i];
-      dstCh.min_tok = applications->getChannels()[i]->initTokens;
-      dstCh.max_tok = applications->getChannels()[i]->initTokens;
+      dstCh.min_tok = applications->getChannel(i)->initTokens;
+      dstCh.max_tok = applications->getChannel(i)->initTokens;
       dstCh.channel = i;
       dstCh.recOrder = receivingNext[i];
 
@@ -252,7 +252,7 @@ void Design::constructMSAG() {
       dst = b::vertex(rec_actor, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, receivingTime[i]);
-      b::put(b::edge_weight2, b_msag, _e, applications->getChannels()[i]->initTokens);
+      b::put(b::edge_weight2, b_msag, _e, applications->getChannel(i)->initTokens);
       //delay-weight for self-loop on rec-actor:
       tie(_e, found) = edge(dst, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, receivingTime[i]);
@@ -271,24 +271,24 @@ void Design::constructMSAG() {
       }
 
       //save the receiving actors for each actor (for next order)
-      if(receivingActors[applications->getChannels()[i]->destination] == -1){ //first rec_actor for the dst
-        receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+      if(receivingActors[applications->getChannel(i)->destination] == -1){ //first rec_actor for the dst
+        receivingActors[applications->getChannel(i)->destination] = rec_actor;
       }else{
-        int curRec_actor_ch = channelMapping[receivingActors[applications->getChannels()[i]->destination] - no_actors];
+        int curRec_actor_ch = channelMapping[receivingActors[applications->getChannel(i)->destination] - no_actors];
         //if(receivingNext[curRec_actor_ch].assigned())
         {
           if(receivingNext[curRec_actor_ch] < (int) no_channels){
-            if(applications->getChannels()[receivingNext[curRec_actor_ch]]->destination != applications->getChannels()[i]->destination){ //last rec_actor for this dst
-              receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+            if(applications->getChannel(receivingNext[curRec_actor_ch])->destination != applications->getChannel(i)->destination){ //last rec_actor for this dst
+              receivingActors[applications->getChannel(i)->destination] = rec_actor;
             } //else
           }else{ //last rec_actor for this dst
-            receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+            receivingActors[applications->getChannel(i)->destination] = rec_actor;
           }
         }
         //if(receivingNext[channelMapping[rec_actor - no_actors]].assigned())
         {
-          if(receivingNext[channelMapping[rec_actor - no_actors]] == receivingActors[applications->getChannels()[i]->destination]){
-            receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+          if(receivingNext[channelMapping[rec_actor - no_actors]] == receivingActors[applications->getChannel(i)->destination]){
+            receivingActors[applications->getChannel(i)->destination] = rec_actor;
           }
         }
       }
@@ -297,8 +297,8 @@ void Design::constructMSAG() {
       SuccessorNode succRec;
       succRec.successor_key = send_actor;
       succRec.delay = sendingTime[i];
-      succRec.min_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
-      succRec.max_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
+      succRec.min_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
+      succRec.max_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
       succRec.channel = i;
 
       //add to boost-msag
@@ -306,7 +306,7 @@ void Design::constructMSAG() {
       dst = b::vertex(send_actor, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, sendingTime[i]);
-      b::put(b::edge_weight2, b_msag, _e, recbufferSz[i] - applications->getChannels()[i]->initTokens);
+      b::put(b::edge_weight2, b_msag, _e, recbufferSz[i] - applications->getChannel(i)->initTokens);
 
       n_msagChannels++;
       if(printDebug)
@@ -323,33 +323,33 @@ void Design::constructMSAG() {
 
       channel_count += 3;
     }else if(sendingTime[i] == 0){ //Step 1b: add all edges from G to the MSAG
-      //if(!sendingTime[i].assigned() || (sendingTime[i].assigned() && applications->getChannels()[i]->initTokens > 0) || (sendingTime[i].assigned() && !next[ch_src[i]].assigned())){
-      if((applications->getChannels()[i]->initTokens > 0) ){
+      //if(!sendingTime[i].assigned() || (sendingTime[i].assigned() && applications->getChannel(i)->initTokens > 0) || (sendingTime[i].assigned() && !next[ch_src[i]].assigned())){
+      if((applications->getChannel(i)->initTokens > 0) ){
         //ch_src[i] -> ch_dst[i]: add channel destination as successor node of the channel source
         SuccessorNode _dst;
-        _dst.successor_key = applications->getChannels()[i]->destination;
-        _dst.delay = wcet[applications->getChannels()[i]->destination];
-        _dst.min_tok = applications->getChannels()[i]->initTokens;
-        _dst.max_tok = applications->getChannels()[i]->initTokens;
+        _dst.successor_key = applications->getChannel(i)->destination;
+        _dst.delay = wcet[applications->getChannel(i)->destination];
+        _dst.min_tok = applications->getChannel(i)->initTokens;
+        _dst.max_tok = applications->getChannel(i)->initTokens;
         _dst.channel = i;
 
         //add to boost-msag
-        src = b::vertex(applications->getChannels()[i]->source, b_msag);
-        dst = b::vertex(applications->getChannels()[i]->destination, b_msag);
+        src = b::vertex(applications->getChannel(i)->source, b_msag);
+        dst = b::vertex(applications->getChannel(i)->destination, b_msag);
         b::tie(_e, found) = b::add_edge(src, dst, b_msag);
-        b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannels()[i]->destination]);
-        b::put(b::edge_weight2, b_msag, _e, applications->getChannels()[i]->initTokens);
+        b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannel(i)->destination]);
+        b::put(b::edge_weight2, b_msag, _e, applications->getChannel(i)->initTokens);
 
         n_msagChannels++;
         if(printDebug)
         {
-          unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannels()[i]->source);
+          unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannel(i)->source);
           if(it != msaGraph.end()){ //i already has an entry in the map
-            msaGraph.at(applications->getChannels()[i]->source).push_back(_dst);
+            msaGraph.at(applications->getChannel(i)->source).push_back(_dst);
           }else{ //no entry for i yet
             vector<SuccessorNode> dstv;
             dstv.push_back(_dst);
-            msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannels()[i]->source, dstv));
+            msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannel(i)->source, dstv));
           }
         }
       }
@@ -452,7 +452,7 @@ void Design::constructMSAG() {
           nextCh = -1; //nextCh = ch_dst[channelMapping[i]];
           nextFound = true;
         }else{ //not end of chain (nextCh < no_channels)
-          if(applications->getChannels()[nextCh]->destination != applications->getChannels()[channelMapping[i]]->destination){ //next rec actor belongs to other dst
+          if(applications->getChannel(nextCh)->destination != applications->getChannel(channelMapping[i])->destination){ //next rec actor belongs to other dst
             nextCh = -1; //nextCh = ch_dst[channelMapping[i]];
             nextFound = true;
           }else{ //same dst
@@ -473,8 +473,8 @@ void Design::constructMSAG() {
     //cout << "  found " << nextCh;
 
     SuccessorNode succRec;
-    succRec.successor_key = nextCh == -1 ? applications->getChannels()[channelMapping[i]]->destination : getRecActor(nextCh);
-    succRec.delay = nextCh == -1 ? wcet[applications->getChannels()[channelMapping[i]]->destination] : receivingTime[nextCh];
+    succRec.successor_key = nextCh == -1 ? applications->getChannel(channelMapping[i])->destination : getRecActor(nextCh);
+    succRec.delay = nextCh == -1 ? wcet[applications->getChannel(channelMapping[i])->destination] : receivingTime[nextCh];
     succRec.min_tok = 0;
     succRec.max_tok = 0;
     if(nextCh != -1)
@@ -484,9 +484,9 @@ void Design::constructMSAG() {
 
     //add to boost-msag
     src = b::vertex(i + no_actors, b_msag);
-    dst = b::vertex(nextCh == -1 ? applications->getChannels()[channelMapping[i]]->destination : getRecActor(nextCh), b_msag);
+    dst = b::vertex(nextCh == -1 ? applications->getChannel(channelMapping[i])->destination : getRecActor(nextCh), b_msag);
     b::tie(_e, found) = b::add_edge(src, dst, b_msag);
-    b::put(b::edge_weight, b_msag, _e, nextCh == -1 ? wcet[applications->getChannels()[channelMapping[i]]->destination] : receivingTime[nextCh]);
+    b::put(b::edge_weight, b_msag, _e, nextCh == -1 ? wcet[applications->getChannel(channelMapping[i])->destination] : receivingTime[nextCh]);
     b::put(b::edge_weight2, b_msag, _e, 0);
 
     n_msagChannels++;
@@ -642,7 +642,7 @@ int Design::getRecActor(int ch_id) const {
 int Design::getApp(int msagActor_id) const {
   int id = msagActor_id;
   if(msagActor_id >= (int) no_actors){
-    id = applications->getChannels()[channelMapping[msagActor_id - no_actors]]->destination;
+    id = applications->getChannel(channelMapping[msagActor_id - no_actors])->destination;
   }
   for(size_t i = 0; i < no_actors; i++){
     if(id <= appIndex[i])
@@ -832,8 +832,8 @@ void Design::init_vectors(){
     
     for(size_t i=0;i<no_channels;i++){
         /// sendingTime 
-        int src_i = applications->getChannels()[i]->source;
-        int dest_i = applications->getChannels()[i]->destination;
+        int src_i = applications->getChannel(i)->source;
+        int dest_i = applications->getChannel(i)->destination;
         int proc_src_i = proc_mappings[src_i];
         int proc_dest_i = proc_mappings[dest_i];    
         if(proc_src_i != proc_dest_i){
@@ -841,14 +841,14 @@ void Design::init_vectors(){
              /// sendingLatency
              sendingLatency.push_back(mapping->wcBlockingTimes()[tdmaAlloc[proc_src_i]]);    
              /// memCons
-             memCons[proc_src_i] += applications->getChannels()[i]->messageSize;
-             memCons[proc_dest_i] += applications->getChannels()[i]->messageSize;
+             memCons[proc_src_i] += applications->getChannel(i)->messageSize;
+             memCons[proc_dest_i] += applications->getChannel(i)->messageSize;
         }else{
             sendingTime.push_back(0);///zero sending time if on the same processor
             sendingLatency.push_back(0);
             sendbufferSz[i] = 0; ///also no need for buffer
             /// memCons
-            memCons[proc_src_i] += applications->getChannels()[i]->messageSize;            
+            memCons[proc_src_i] += applications->getChannel(i)->messageSize;            
         }
         ///(iv) receivingTime -> zero for TDMA-based platform
         receivingTime.push_back(0);    
@@ -979,7 +979,7 @@ void Design::printThroughputGraphAsDot(const string &dir) const {
       close = true;
     }
     for(size_t j = 0; j < no_channels; j++){
-      if((int)i == applications->getChannels()[j]->destination && getRecActor(j) != -1){
+      if((int)i == applications->getChannel(i)->destination && getRecActor(j) != -1){
         if(!close){
           out << "    { rank=same; ";
           out << "actor_" + to_string(i) << " ";
@@ -1089,8 +1089,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
       succB.channel = i;
 
       //add to boost-msag
-      boost_msag_des& curr_graph = *b_msags[msagId[applications->getChannels()[i]->source]];
-      src = g.getVertex(applications->getChannels()[i]->source);    //b::vertex(ch_src[i], *b_msags[msagId[ch_src[i]]]);
+      boost_msag_des& curr_graph = *b_msags[msagId[applications->getChannel(i)->source]];
+      src = g.getVertex(applications->getChannel(i)->source);    //b::vertex(ch_src[i], *b_msags[msagId[ch_src[i]]]);
       dst = g.getVertex(block_actor);  //b::vertex(block_actor, *b_msags[msagId[ch_src[i]]]);
       b::tie(_e, found) = b::add_edge(src, dst, curr_graph);
       b::put(b::edge_weight, curr_graph, _e, sendingLatency[i]);
@@ -1102,29 +1102,29 @@ void Design::constructMSAG(vector<int> &msagMap) {
 
       n_msagChannels++;
       if(printDebug){
-        unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannels()[i]->source);
+        unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannel(i)->source);
         if(it != msaGraph.end()){    //i already has an entry in the map
-          msaGraph.at(applications->getChannels()[i]->source).push_back(succB);
+          msaGraph.at(applications->getChannel(i)->source).push_back(succB);
         }else{      //no entry for ch_src[i] yet
           vector<SuccessorNode> succBv;
           succBv.push_back(succB);
-          msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannels()[i]->source, succBv));
+          msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannel(i)->source, succBv));
         }
       }
 
       //add ch_src[i] as successor of the block actor, with buffer size as tokens
       SuccessorNode srcCh;
-      srcCh.successor_key = applications->getChannels()[i]->source;
-      srcCh.delay = wcet[applications->getChannels()[i]->source];
+      srcCh.successor_key = applications->getChannel(i)->source;
+      srcCh.delay = wcet[applications->getChannel(i)->source];
       srcCh.min_tok = sendbufferSz[i];
       srcCh.max_tok = sendbufferSz[i];
 
       //add to boost-msag
       boost_msag_des& curr_graph1 = *b_msags[msagId[block_actor]];
       src = g.getVertex(block_actor);  //b::vertex(block_actor, *b_msags[msagId[block_actor]]);
-      dst = g.getVertex(applications->getChannels()[i]->source);    //b::vertex(ch_src[i], *b_msags[msagId[block_actor]]);
+      dst = g.getVertex(applications->getChannel(i)->source);    //b::vertex(ch_src[i], *b_msags[msagId[block_actor]]);
       b::tie(_e, found) = b::add_edge(src, dst, *b_msags[msagId[block_actor]]);
-      b::put(b::edge_weight, curr_graph1, _e, wcet[applications->getChannels()[i]->source]);
+      b::put(b::edge_weight, curr_graph1, _e, wcet[applications->getChannel(i)->source]);
       b::put(b::edge_weight2, curr_graph1, _e, sendbufferSz[i]);
 
       n_msagChannels++;
@@ -1202,8 +1202,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
       SuccessorNode dstCh;
       dstCh.successor_key = rec_actor;
       dstCh.delay = receivingTime[i];
-      dstCh.min_tok = applications->getChannels()[i]->initTokens;
-      dstCh.max_tok = applications->getChannels()[i]->initTokens;
+      dstCh.min_tok = applications->getChannel(i)->initTokens;
+      dstCh.max_tok = applications->getChannel(i)->initTokens;
       dstCh.channel = i;
       dstCh.recOrder = receivingNext[i];
 
@@ -1213,7 +1213,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
       dst = g.getVertex(rec_actor);    //b::vertex(rec_actor, *b_msags[msagId[send_actor]]);
       b::tie(_e, found) = b::add_edge(src, dst, curr_graph4);
       b::put(b::edge_weight, curr_graph4, _e, receivingTime[i]);
-      b::put(b::edge_weight2, curr_graph4, _e, applications->getChannels()[i]->initTokens);
+      b::put(b::edge_weight2, curr_graph4, _e, applications->getChannel(i)->initTokens);
       //delay-weight for self-loop on rec-actor:
       tie(_e, found) = edge(dst, dst, curr_graph4);
       b::put(b::edge_weight, curr_graph4, _e, receivingTime[i]);
@@ -1231,24 +1231,24 @@ void Design::constructMSAG(vector<int> &msagMap) {
       }
 
       //save the receiving actors for each actor (for next order)
-      if(receivingActors[applications->getChannels()[i]->destination] == -1){ //first rec_actor for the dst
-        receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+      if(receivingActors[applications->getChannel(i)->destination] == -1){ //first rec_actor for the dst
+        receivingActors[applications->getChannel(i)->destination] = rec_actor;
       }else{
-        int curRec_actor_ch = channelMapping[receivingActors[applications->getChannels()[i]->destination] - no_actors];
+        int curRec_actor_ch = channelMapping[receivingActors[applications->getChannel(i)->destination] - no_actors];
         //if(receivingNext[curRec_actor_ch].assigned())
         {
           if(receivingNext[curRec_actor_ch] < (int) no_channels){
-            if(applications->getChannels()[receivingNext[curRec_actor_ch]]->destination != applications->getChannels()[i]->destination){ //last rec_actor for this dst
-              receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+            if(applications->getChannel(receivingNext[curRec_actor_ch])->destination != applications->getChannel(i)->destination){ //last rec_actor for this dst
+              receivingActors[applications->getChannel(i)->destination] = rec_actor;
             } //else
           }else{ //last rec_actor for this dst
-            receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+            receivingActors[applications->getChannel(i)->destination] = rec_actor;
           }
         }
         //if(receivingNext[channelMapping[rec_actor - no_actors]].assigned())
         {
-          if(receivingNext[channelMapping[rec_actor - no_actors]] == receivingActors[applications->getChannels()[i]->destination]){
-            receivingActors[applications->getChannels()[i]->destination] = rec_actor;
+          if(receivingNext[channelMapping[rec_actor - no_actors]] == receivingActors[applications->getChannel(i)->destination]){
+            receivingActors[applications->getChannel(i)->destination] = rec_actor;
           }
         }
       }
@@ -1257,8 +1257,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
       SuccessorNode succRec;
       succRec.successor_key = send_actor;
       succRec.delay = sendingTime[i];
-      succRec.min_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
-      succRec.max_tok = recbufferSz[i] - applications->getChannels()[i]->initTokens;
+      succRec.min_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
+      succRec.max_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
       succRec.channel = i;
 
       //add to boost-msag
@@ -1267,7 +1267,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
       dst = g.getVertex(send_actor);   //b::vertex(send_actor, *b_msags[msagId[rec_actor]]);
       b::tie(_e, found) = b::add_edge(src, dst, curr_graph5);
       b::put(b::edge_weight, curr_graph5, _e, sendingTime[i]);
-      b::put(b::edge_weight2, curr_graph5, _e, recbufferSz[i] - applications->getChannels()[i]->initTokens);
+      b::put(b::edge_weight2, curr_graph5, _e, recbufferSz[i] - applications->getChannel(i)->initTokens);
 
       n_msagChannels++;
       if(printDebug){
@@ -1283,32 +1283,32 @@ void Design::constructMSAG(vector<int> &msagMap) {
 
       channel_count += 3;
     }else if(sendingTime[i] == 0){ //Step 1b: add all edges from G to the MSAG
-      if((applications->getChannels()[i]->initTokens > 0)){
+      if((applications->getChannel(i)->initTokens > 0)){
         //ch_src[i] -> ch_dst[i]: add channel destination as successor node of the channel source
         SuccessorNode _dst;
-        _dst.successor_key = applications->getChannels()[i]->destination;
-        _dst.delay = wcet[applications->getChannels()[i]->destination];
-        _dst.min_tok = applications->getChannels()[i]->initTokens;
-        _dst.max_tok = applications->getChannels()[i]->initTokens;
+        _dst.successor_key = applications->getChannel(i)->destination;
+        _dst.delay = wcet[applications->getChannel(i)->destination];
+        _dst.min_tok = applications->getChannel(i)->initTokens;
+        _dst.max_tok = applications->getChannel(i)->initTokens;
         _dst.channel = i;
 
         //add to boost-msag
-        boost_msag_des& curr_graph5 = *b_msags[msagId[applications->getChannels()[i]->source]];
-        src = g.getVertex(applications->getChannels()[i]->source);   //b::vertex(ch_src[i], *b_msags[msagId[ch_src[i]]]);
-        dst = g.getVertex(applications->getChannels()[i]->destination);   //b::vertex(ch_dst[i], *b_msags[msagId[ch_src[i]]]);
+        boost_msag_des& curr_graph5 = *b_msags[msagId[applications->getChannel(i)->source]];
+        src = g.getVertex(applications->getChannel(i)->source);   //b::vertex(ch_src[i], *b_msags[msagId[ch_src[i]]]);
+        dst = g.getVertex(applications->getChannel(i)->destination);   //b::vertex(ch_dst[i], *b_msags[msagId[ch_src[i]]]);
         b::tie(_e, found) = b::add_edge(src, dst, curr_graph5);
-        b::put(b::edge_weight, curr_graph5, _e, wcet[applications->getChannels()[i]->destination]);
-        b::put(b::edge_weight2, curr_graph5, _e, applications->getChannels()[i]->initTokens);
+        b::put(b::edge_weight, curr_graph5, _e, wcet[applications->getChannel(i)->destination]);
+        b::put(b::edge_weight2, curr_graph5, _e, applications->getChannel(i)->initTokens);
 
         n_msagChannels++;
         if(printDebug){
-          unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannels()[i]->source);
+          unordered_map<int, vector<SuccessorNode>>::const_iterator it = msaGraph.find(applications->getChannel(i)->source);
           if(it != msaGraph.end()){ //i already has an entry in the map
-            msaGraph.at(applications->getChannels()[i]->source).push_back(_dst);
+            msaGraph.at(applications->getChannel(i)->source).push_back(_dst);
           }else{ //no entry for i yet
             vector<SuccessorNode> dstv;
             dstv.push_back(_dst);
-            msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannels()[i]->source, dstv));
+            msaGraph.insert(pair<int, vector<SuccessorNode>>(applications->getChannel(i)->source, dstv));
           }
         }
       }
@@ -1411,7 +1411,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
           nextCh = -1; //nextCh = ch_dst[channelMapping[i]];
           nextFound = true;
         }else{ //not end of chain (nextCh < n_channels)
-          if(applications->getChannels()[nextCh]->destination != applications->getChannels()[channelMapping[i]]->destination){ //next rec actor belongs to other dst
+          if(applications->getChannel(nextCh)->destination != applications->getChannel(channelMapping[i])->destination){ //next rec actor belongs to other dst
             nextCh = -1; //nextCh = ch_dst[channelMapping[i]];
             nextFound = true;
           }else{ //same dst
@@ -1431,8 +1431,8 @@ void Design::constructMSAG(vector<int> &msagMap) {
     //cout << "  found " << nextCh;
 
     SuccessorNode succRec;
-    succRec.successor_key = nextCh == -1 ? applications->getChannels()[channelMapping[i]]->destination : getRecActor(nextCh);
-    succRec.delay = nextCh == -1 ? wcet[applications->getChannels()[channelMapping[i]]->destination] : receivingTime[nextCh];
+    succRec.successor_key = nextCh == -1 ? applications->getChannel(channelMapping[i])->destination : getRecActor(nextCh);
+    succRec.delay = nextCh == -1 ? wcet[applications->getChannel(channelMapping[i])->destination] : receivingTime[nextCh];
     succRec.min_tok = 0;
     succRec.max_tok = 0;
     if(nextCh != -1)
@@ -1444,9 +1444,9 @@ void Design::constructMSAG(vector<int> &msagMap) {
     int tmp = i + no_actors;
     boost_msag_des& curr_graph7 = *b_msags[msagId[tmp]];
     src = g.getVertex(tmp);            //b::vertex(tmp, *b_msags[msagId[tmp]]);
-    dst = g.getVertex(nextCh == -1 ? applications->getChannels()[channelMapping[i]]->destination : getRecActor(nextCh)); //b::vertex(nextCh == -1 ? ch_dst[channelMapping[i]] : getRecActor(nextCh),*b_msags[msagId[tmp]]);
+    dst = g.getVertex(nextCh == -1 ? applications->getChannel(channelMapping[i])->destination : getRecActor(nextCh)); //b::vertex(nextCh == -1 ? ch_dst[channelMapping[i]] : getRecActor(nextCh),*b_msags[msagId[tmp]]);
     b::tie(_e, found) = b::add_edge(src, dst, curr_graph7);
-    b::put(b::edge_weight, curr_graph7, _e, nextCh == -1 ? wcet[applications->getChannels()[channelMapping[i]]->destination] : receivingTime[nextCh]);
+    b::put(b::edge_weight, curr_graph7, _e, nextCh == -1 ? wcet[applications->getChannel(channelMapping[i])->destination] : receivingTime[nextCh]);
     b::put(b::edge_weight2, curr_graph7, _e, 0);
 
     n_msagChannels++;
