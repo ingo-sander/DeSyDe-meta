@@ -83,7 +83,7 @@ public:
     };
     vector<int> get_periods();
     int get_energy();
-    void static print_vector(const vector<int>);
+    vector<int> get_slack_memory();
     friend std::ostream& operator<< (std::ostream &out, const Design &des);
 private:
     shared_ptr<Mapping> mapping; /**< reference to the mapping class. */

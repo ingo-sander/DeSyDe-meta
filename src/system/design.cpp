@@ -1577,12 +1577,6 @@ void Design::constructMSAG(vector<int> &msagMap) {
   }
 }
 
-void Design::print_vector(const vector<int> input)
-{
-    for(auto i : input)
-        cout << i << ",";    
-    cout << "}\n";    
-}
 
 void Design::calc_energy()
 {
@@ -1626,6 +1620,16 @@ int Design::get_energy()
 {
     calc_energy();
     return energy;
+}
+vector<int> Design::get_slack_memory()
+{
+    vector<int> s;
+    for(size_t i=0;i<no_processors;i++)
+    {
+        s.push_back( mapping->getPlatform()->getMemorySize(i)[proc_modes[i]] 
+                    - memCons[i]);
+    }
+    return s;
 }
 std::ostream& operator<< (std::ostream &out, const Design &des)
 {
