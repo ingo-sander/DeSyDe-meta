@@ -112,13 +112,19 @@ public:
     ThroughputPropagator      th_prop;
     OutputFileType            out_file_type;
     OutputPrintFrequency      out_print_freq;
+    
+   size_t generation;
+   size_t particle_per_obj;
+   float  w_individual;
+   float  w_social;
+   float  w_current;
   };
   struct PresolverResults{
     size_t it_mapping; /**< Informs the CP model how to use oneProcMappings: <.size(): Enforce mapping, >=.size() Forbid all. */
     vector<vector<tuple<int,int>>> oneProcMappings;
     vector<vector<int>> periods;
     vector<int> sys_energys;
-  };
+  };  
 
 public:
 
@@ -177,7 +183,12 @@ private:
   void setPresolverModel(const std::vector<std::string> &) throw (InvalidFormatException);
   void setPresolverSearch(const std::string &) throw (InvalidFormatException);
   void setOutputFileType(const std::string &) throw (InvalidFormatException);
-  void setOutputPrintFrequency(const std::string &) throw (InvalidFormatException);
+  void setOutputPrintFrequency(const std::string &) throw (InvalidFormatException);  
+  void setNoGenerations(size_t) throw (InvalidFormatException);
+  void setNoParticles(size_t) throw (InvalidFormatException);
+  void setWeightInd(float) throw (InvalidFormatException);
+  void setWeightSoc(float) throw (InvalidFormatException);
+  void setWeightCur(float) throw (InvalidFormatException);
 
 };
 

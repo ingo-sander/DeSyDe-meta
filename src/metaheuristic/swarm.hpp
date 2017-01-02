@@ -50,12 +50,12 @@ struct ParetoFront
      * Compares the input position with the current front 
      * and replaces if it dominates
      */ 
-    void update_pareto(Position);
+    bool update_pareto(Position);
     friend std::ostream& operator<< (std::ostream &out, const ParetoFront &p);
 };
 class Swarm{
 public: 
-    Swarm(shared_ptr<Mapping>, shared_ptr<Applications>);
+    Swarm(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
     ~Swarm();
     void search();
     friend std::ostream& operator<< (std::ostream &out, const Swarm &swarm);
@@ -68,7 +68,7 @@ private:
     const size_t no_generations; /**< total number of particles. */
     const int no_threads;
     int particle_per_thread;
-    ParetoFront pareto;
+    ParetoFront par_f;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
     int random_obj();/** returns a random objective. */

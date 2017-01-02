@@ -147,11 +147,35 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
              "Search type.\n"
              "Valid options NONESEARCH, FIRST, ALL, OPTIMIZE, OPTIMIZE_IT, GIST_ALL, GIST_OPT, META_HEU. ");
 
+  po::options_description meta("Metaheuristic options");
+  meta.add_options()
+      ("meta.generation",
+          po::value<size_t>()->default_value(10)->notifier(
+              boost::bind(&Config::setNoGenerations, this, _1)),
+          "Number of generations used in the search.")
+      ("meta.particles",
+          po::value<size_t>()->default_value(10)->notifier(
+              boost::bind(&Config::setNoParticles, this, _1)),
+          "Number of particles per objective used in the search.")
+      ("meta.w_individual",
+          po::value<float>()->default_value(.5)->notifier(
+              boost::bind(&Config::setWeightInd, this, _1)),
+          "Weight of the individual component.")
+      ("meta.w_social",
+          po::value<float>()->default_value(0.25)->notifier(
+              boost::bind(&Config::setWeightSoc, this, _1)),
+          "Weight of the social component.")
+      ("meta.w_current",
+          po::value<float>()->default_value(0.25)->notifier(
+              boost::bind(&Config::setWeightCur, this, _1)),
+          "Weight of the current position.");
+  
+  
   po::variables_map vm;
   po::options_description visible_options, all_options;
 
-  visible_options.add(generic).add(presolver).add(dse);
-  all_options.add(hidden).add(generic).add(presolver).add(dse);
+  visible_options.add(generic).add(presolver).add(dse).add(meta);
+  all_options.add(hidden).add(generic).add(presolver).add(dse).add(meta);
 
 
   auto cli_options = po::command_line_parser(argc, argv).options(all_options).positional(p).run();
@@ -465,7 +489,21 @@ void Config::setPresolverSearch(const string &str) throw (InvalidFormatException
 void Config::setPresolverResults(shared_ptr<Config::PresolverResults> _p){
   pre_results = _p;
 }
-
+void Config::setNoGenerations(size_t g) throw (InvalidFormatException){
+  settings_.generation = g;
+}
+void Config::setNoParticles(size_t p) throw (InvalidFormatException){
+  settings_.particle_per_obj = p;
+}
+void Config::setWeightInd(float w) throw (InvalidFormatException){
+  settings_.w_individual = w;
+}
+void Config::setWeightSoc(float w) throw (InvalidFormatException){
+  settings_.w_social = w;
+}
+void Config::setWeightCur(float w) throw (InvalidFormatException){
+  settings_.w_current = w;
+}
 shared_ptr<Config::PresolverResults> Config::getPresolverResults(){
   if(!pre_results)  
       THROW_EXCEPTION(RuntimeException, "no presolver results exist");

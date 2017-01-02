@@ -78,6 +78,24 @@ private:
      */ 
     void repair_dist();    
 };
+struct Speed{
+    Speed(int no_actors, int no_channels, int no_processors)
+    {
+        proc_sched.resize(no_actors, 0);
+        send_sched.resize(no_channels, 0);
+        rec_sched.resize(no_channels, 0);
+        proc_mappings.resize(no_actors, 0);
+        proc_modes.resize(no_processors, 0);
+        tdmaAlloc.resize(no_processors, 0);
+    }
+    vector<float> proc_sched;
+    vector<float> send_sched;
+    vector<float> rec_sched;
+    vector<float> proc_mappings;
+    vector<float> proc_modes;
+    vector<float> tdmaAlloc;
+    friend std::ostream& operator<< (std::ostream &out, const Speed &s);
+};
 struct Position{
 public:    
    ~Position()
@@ -113,7 +131,7 @@ public:
             rec_sched.push_back(std::move(s));               
         return *this;
     }
-
+   
  
     bool empty() const
     {
@@ -124,12 +142,18 @@ public:
         float diff = w*(b - a);
         return Schedule::random_round((float) a + diff);
     }
+    static int weighted_sum(int a, int b, int c, float w1, float w2) 
+    {
+        float diff1 = w1*(b - a);
+        float diff2 = w2*(c - a);
+        return Schedule::random_round((float) a + diff1 + diff2);
+    }
  
   
 };
 class Particle{
 public: 
-    Particle(shared_ptr<Mapping>, shared_ptr<Applications>);
+    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float);
     /** 
      * Returns the fitness value of the particle with respect to different objectives.
      */ 
@@ -140,8 +164,9 @@ public:
     Position get_current_position();
     Position get_best_local_position();
     void update_position();/** updates the current position based on the local best and global best.*/
-    friend std::ostream& operator<< (std::ostream &out, const Particle &particle);
-    static std::ostream& print_vector (std::ostream &out, const vector<int> &v) ;
+    void move() ;
+    int get_objective();
+    friend std::ostream& operator<< (std::ostream &out, const Particle &particle);    
 private:    
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
@@ -150,9 +175,14 @@ private:
     const size_t no_channels; /**< total number of channels. */
     const size_t no_processors; /**< total number of processors. */
     const size_t no_tdma_slots; /**< total number of TDMA slots. */
+    const int objective;/** objective of the particle. */
     Position current_position;
     Position best_local_position;
     Position best_global_position;
+    Speed speed;
+    float w_s;/**< weight of current speed. */
+    float w_lb;/**< weight of local best.*/
+    float w_gb;/**< weight of global best.*/
     void init_random();
     void build_schedules(Position&);/** builds proc_sched, send_sched and rec_sched based on the mappings.*/        
     void repair_tdma(Position&);
@@ -160,6 +190,7 @@ private:
     void repair_send_sched(Position&);
     void repair_rec_sched(Position&);    
     void repair(Position&);
+    void update_speed();
     vector<int> get_channel_by_src(Position&, int) const;
     vector<int> get_channel_by_dst(Position&, int) const;    
     /**
@@ -167,7 +198,8 @@ private:
      * Uses the weight in adding.
      */ 
     void add_positions(Position& p1, const Position& p2, float w) ;
-    bool is_better_than_lb(vector<int> f);
+    void add_positions(Position& p1, const Position& p2, Position& p3, float w1, float w2) ;
+    bool dominate(vector<int> f);
     int bring_to_bound(int, int, int);
     vector<int> bring_v_to_bound(vector<int>, int, int);
 };

@@ -1,16 +1,18 @@
 #include "swarm.hpp"
-Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application):
+Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& cfg):
                     mapping(_mapping),
                     applications(_application),
-                    no_objectives(mapping->getNumberOfApps()+1),
-                    no_particles(100),
-                    no_generations(200),
-                    no_threads(4),
-                    pareto(no_objectives)                    
+                    no_objectives(mapping->getNumberOfApps()+2),
+                    no_particles(10*cfg.settings().particle_per_obj),
+                    no_generations(cfg.settings().generation),
+                    no_threads(std::thread::hardware_concurrency()),
+                    par_f(no_objectives)                    
 {   
     for(size_t i=0;i<no_particles;i++)
     {
-        shared_ptr<Particle> p(new Particle(mapping, applications));
+        shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
+                                cfg.settings().w_current, 
+                                cfg.settings().w_individual, cfg.settings().w_social));        
         particle_set.push_back(p);
     }    
     particle_per_thread = no_particles / no_threads;
@@ -21,6 +23,7 @@ Swarm::~Swarm()
 }
 void Swarm::search()
 {
+    auto last_update = 0;
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
     auto dur_update = runTimer::now() - runTimer::now();
@@ -48,10 +51,12 @@ void Swarm::search()
         ///Find the best particle
         for(auto p: particle_set)
         {
-            pareto.update_pareto(p->get_current_position());
+            if(par_f.update_pareto(p->get_current_position()))
+                last_update = g;
+            //cout << tools::toString(p->get_current_position().fitness) << endl;
         }
         cout << "pareto front--------------------------\n"
-             << pareto << endl;  
+             << par_f << endl;  
         auto start_update = runTimer::now();
         if(g+1 < no_generations)        
         {
@@ -75,7 +80,11 @@ void Swarm::search()
     auto dur_update_s = std::chrono::duration_cast<std::chrono::milliseconds>(dur_update).count();
     auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(durAll).count();
     cout    << "===== search ended after: " << durAll_s << " s (" << durAll_ms 
-            << " ms)\nfitness=" << dur_fitness_s << " update=" << dur_update_s << endl;
+            << " ms)\nfitness=" << dur_fitness_s << "ms update=" << dur_update_s << "ms \n"
+            << "no threads=" << no_threads 
+            << " last update in generation " << last_update
+            << endl;
+            //<< "particle 0:\n" <<  *particle_set[0] << endl;
         
 }
 std::ostream& operator<< (std::ostream &out, const Swarm &swarm)
@@ -100,7 +109,7 @@ ParetoFront::ParetoFront(int no_obj)
 std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
 {
     for(auto po : p.pareto)
-        out << Particle::print_vector(out, po.fitness) << endl;
+        out << tools::toString(po.fitness) << endl;
     return out;    
 }
 bool ParetoFront::dominate(Position& p, int obj)
@@ -111,23 +120,25 @@ bool ParetoFront::dominate(Position& p, int obj)
         if(f < 0)
             return false;
         
-    if(pareto[obj].empty() && !p.empty() && p.fitness[obj] > 0)
+    if(pareto[obj].empty() && !p.empty() && p.fitness[obj] >= 0)
         return true;    
-    
     if(pareto[obj].fitness[obj] > p.fitness[obj])
         return true;
     else
         return false;        
 }
-void ParetoFront::update_pareto(Position p)
+bool ParetoFront::update_pareto(Position p)
 {
+    bool is_updated = false;
     for(size_t obj=0;obj<pareto.size();obj++)
     {
         if(dominate(p, obj))
         {
             pareto[obj] = p;
+            is_updated = true;
         }
     }
+    return is_updated;
 }
 
 void Swarm::calc_fitness(int t_id)
@@ -150,10 +161,10 @@ void Swarm::update_position(int t_id)
         
     for(int i=start_id;i<end_id;i++)    
     {
-        int obj = random_obj();
-        if(!pareto.pareto[obj].empty())
+        int obj = particle_set[i]->get_objective();//random_obj();
+        if(!par_f.pareto[obj].empty())
         {
-            particle_set[i]->set_best_global(pareto.pareto[obj]);
+            particle_set[i]->set_best_global(par_f.pareto[obj]);
             particle_set[i]->update_position();
         }
     }
