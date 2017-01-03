@@ -1,12 +1,13 @@
 #include "swarm.hpp"
-Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& cfg):
+Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& _cfg):
+                    cfg(_cfg),
                     mapping(_mapping),
                     applications(_application),
                     no_objectives(mapping->getNumberOfApps()+2),
-                    no_particles(10*cfg.settings().particle_per_obj),
+                    no_particles(no_objectives*cfg.settings().particle_per_obj),
                     no_generations(cfg.settings().generation),
                     no_threads(std::thread::hardware_concurrency()),
-                    par_f(no_objectives)                    
+                    par_f(no_objectives)
 {   
     for(size_t i=0;i<no_particles;i++)
     {
@@ -23,14 +24,18 @@ Swarm::~Swarm()
 }
 void Swarm::search()
 {
+    out.open(cfg.settings().output_path+"out/out.txt");
+    
     auto last_update = 0;
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
     auto dur_update = runTimer::now() - runTimer::now();
     std::thread t[no_particles];
-    for(size_t g=0;g<no_generations;g++)
+    //for(size_t g=0;g<no_generations;g++)
+    size_t g = 0;
+    while(g - last_update < no_generations)
     {
-        LOG_INFO("Generation "+tools::toString(g));
+        LOG_INFO("Generation "+tools::toString(g)+" last_update "+tools::toString(last_update));
         auto start_fitness = runTimer::now();
         for (int i = 0; i < no_threads; i++) 
         {
@@ -58,7 +63,7 @@ void Swarm::search()
         cout << "pareto front--------------------------\n"
              << par_f << endl;  
         auto start_update = runTimer::now();
-        if(g+1 < no_generations)        
+        if(g+1- last_update < no_generations)        
         {
             LOG_DEBUG("updating positions ");
             /// update the positions
@@ -73,19 +78,30 @@ void Swarm::search()
             }
         }   
         dur_update += runTimer::now() - start_update;     
+        g++;
     }
     auto durAll = runTimer::now() - t_start;
     auto durAll_s = std::chrono::duration_cast<std::chrono::seconds>(durAll).count();
     auto dur_fitness_s = std::chrono::duration_cast<std::chrono::milliseconds>(dur_fitness).count();
     auto dur_update_s = std::chrono::duration_cast<std::chrono::milliseconds>(dur_update).count();
     auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(durAll).count();
-    cout    << "===== search ended after: " << durAll_s << " s (" << durAll_ms 
+    std::stringstream stat;
+    stat    << "===== search ended after: " << durAll_s << " s (" << durAll_ms 
             << " ms)\nfitness=" << dur_fitness_s << "ms update=" << dur_update_s << "ms \n"
             << "no threads=" << no_threads 
             << " last update in generation " << last_update
             << endl;
-            //<< "particle 0:\n" <<  *particle_set[0] << endl;
-        
+   cout << stat.str() << endl;
+   out << stat.str() << endl;         
+   string sep="";         
+   for(size_t i=0;i<100;i++)
+       sep+="=";
+   out << sep << endl;    
+   for(auto p : par_f.pareto)
+       out << p << endl << sep << endl;
+   for(auto p : particle_set)
+        out << p->get_speed() << endl << sep << endl;
+   out.close();
 }
 std::ostream& operator<< (std::ostream &out, const Swarm &swarm)
 {

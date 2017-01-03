@@ -60,6 +60,7 @@ public:
     void search();
     friend std::ostream& operator<< (std::ostream &out, const Swarm &swarm);
 private:    
+    Config& cfg;
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
     vector<shared_ptr<Particle>> particle_set;
@@ -69,6 +70,7 @@ private:
     const int no_threads;
     int particle_per_thread;
     ParetoFront par_f;
+    ofstream out;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
     int random_obj();/** returns a random objective. */
