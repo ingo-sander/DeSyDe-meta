@@ -46,6 +46,7 @@ public:
     vector<int> rank_diff(vector<int>);/** element-wise difference of rank and input vector. */
     void rank_add(vector<float>);/** addes the rank with the input (speed). */
     static int random_round(float);/** randomly slecets ceil or floor. */
+    static bool random_bool();
     int get_next(int);
     void switch_ranks(int, int);    
     vector<int> get_elements();
@@ -166,6 +167,7 @@ public:
     void update_position();/** updates the current position based on the local best and global best.*/
     void move() ;
     int get_objective();
+    Speed get_speed();
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);    
 private:    
     shared_ptr<Mapping> mapping;
@@ -183,6 +185,8 @@ private:
     float w_s;/**< weight of current speed. */
     float w_lb;/**< weight of local best.*/
     float w_gb;/**< weight of global best.*/
+    int no_invalid_moves;
+    const int thr_invalid_mov = 30;
     void init_random();
     void build_schedules(Position&);/** builds proc_sched, send_sched and rec_sched based on the mappings.*/        
     void repair_tdma(Position&);
@@ -202,5 +206,6 @@ private:
     bool dominate(vector<int> f);
     int bring_to_bound(int, int, int);
     vector<int> bring_v_to_bound(vector<int>, int, int);
+    float random_weight();
 };
 

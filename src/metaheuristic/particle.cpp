@@ -15,14 +15,10 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     speed(no_actors, no_channels, no_processors),
                     w_s(_w_s),
                     w_lb(_w_lb),
-                    w_gb(_w_gb)
+                    w_gb(_w_gb),
+                    no_invalid_moves(0)                    
 {   
-    init_random();
-    build_schedules(current_position);
-  
-    current_position.fitness.resize(no_entities + 2,0);///energy + memory violations + throughputs    
-    repair(current_position);     
-    
+    init_random();    
 }
 void Particle::build_schedules(Position& p)
 {
@@ -194,6 +190,16 @@ vector<int> Particle::get_channel_by_dst(Position& p, int dst_proc_id) const
 }
 void Particle::init_random()
 {
+    /** clear. */
+    current_position.proc_mappings.clear();
+    current_position.proc_modes.clear();
+    current_position.tdmaAlloc.clear();
+    current_position.fitness.clear();
+    current_position.proc_sched.clear();
+    current_position.send_sched.clear();
+    current_position.rec_sched.clear();
+    no_invalid_moves = 0;
+    
     random_device rnd_device;
     mt19937 mersenne_engine(rnd_device());
     uniform_int_distribution<int> dist_proc(0, no_processors-1);
@@ -217,8 +223,13 @@ void Particle::init_random()
     {
        int no_proc_modes = mapping->getPlatform()->getModes(i);
        std::uniform_int_distribution<int> uni_dist(0,no_proc_modes-1);
-       current_position.proc_modes[i] = uni_dist(mersenne_engine);
+       current_position.proc_modes[i] = uni_dist(mersenne_engine);       
     }
+    
+    
+    build_schedules(current_position);
+    current_position.fitness.resize(no_entities + 2,0);///energy + memory violations + throughputs    
+    repair(current_position);         
 }
 void Particle::repair_tdma(Position& p)
 {
@@ -322,7 +333,14 @@ void Particle::calc_fitness()
     if(dominate(current_position.fitness))
     {   
         best_local_position = current_position;
-    }    
+    }
+    if(current_position.fitness[0] < 0)
+        {
+            no_invalid_moves++;
+            //cout << "no_invalid_moves:" << no_invalid_moves << endl;
+        }
+    else
+        no_invalid_moves = 0;        
     
 }
 vector<int> Particle::get_fitness()
@@ -341,8 +359,20 @@ Position Particle::get_best_local_position()
 {
     return best_local_position;
 }
+Speed Particle::get_speed()
+{
+    return speed;
+}
 void Particle::update_position()
 {   
+    
+    /**
+     * In case the number of invalid moves is more than the threshold,
+     * then reinitialize the particle.
+     */
+    if(no_invalid_moves > thr_invalid_mov)  
+        init_random();
+        
     update_speed();
     /*
     if(!best_global_position.empty() && !best_local_position.empty())
@@ -358,30 +388,41 @@ void Particle::update_position()
     move();
     repair(current_position);    
 }
+float Particle::random_weight()
+{
+    random_device rnd_device;
+    uniform_int_distribution<int> dist(0, 100);
+    mt19937 mersenne_engine(rnd_device());  
+    auto gen = std::bind(dist, mersenne_engine);
+    float w = ((float)gen())/100;
+    return w;    
+}
 void Particle::update_speed()
 {
     if(best_global_position.empty())
         THROW_EXCEPTION(RuntimeException, "update_speed: best_global is empty" );
     if(best_local_position.empty())
         THROW_EXCEPTION(RuntimeException, "update_speed: best_local is empty" );
-        
+    float y1 = random_weight();    
+    float y2 = random_weight();
+    
     for(size_t i=0;i<speed.proc_mappings.size();i++)
     {
         speed.proc_mappings[i] = w_s * speed.proc_mappings[i] +
-                                 w_lb * (best_local_position.proc_mappings[i] - current_position.proc_mappings[i]) +
-                                 w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);
+                                 y1 * w_lb * (best_local_position.proc_mappings[i] - current_position.proc_mappings[i]) +
+                                 y2 * w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);
     }
     for(size_t i=0;i<speed.proc_modes.size();i++)
     {
         speed.proc_modes[i] = w_s * speed.proc_modes[i] +
-                                 w_lb * (best_local_position.proc_modes[i] - current_position.proc_modes[i]) +
-                                 w_gb * (best_global_position.proc_modes[i] - current_position.proc_modes[i]);
+                                 y1 * w_lb * (best_local_position.proc_modes[i] - current_position.proc_modes[i]) +
+                                 y2 * w_gb * (best_global_position.proc_modes[i] - current_position.proc_modes[i]);
     }
     for(size_t i=0;i<speed.tdmaAlloc.size();i++)
     {
         speed.tdmaAlloc[i] = w_s * speed.tdmaAlloc[i] +
-                                 w_lb * (best_local_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]) +
-                                 w_gb *  (best_global_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]);
+                                 y1 * w_lb * (best_local_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]) +
+                                 y2 * w_gb *  (best_global_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]);
     }
     for(size_t i=0;i<speed.proc_sched.size();i++)
     {
@@ -389,8 +430,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[i];
         int bg_p = best_global_position.proc_mappings[i];
         speed.proc_sched[i] = w_s * speed.proc_sched[i] +
-                                 w_lb * (best_local_position.proc_sched[bl_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i)) +
-                                 w_gb * (best_global_position.proc_sched[bg_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.proc_sched[bl_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.proc_sched[bg_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i));
     }
     for(size_t i=0;i<speed.send_sched.size();i++)
     {
@@ -399,8 +440,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[src];
         int bg_p = best_global_position.proc_mappings[src];
         speed.send_sched[i] = w_s * speed.send_sched[i] +
-                                 w_lb * (best_local_position.send_sched[bl_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i)) +
-                                 w_gb * (best_global_position.send_sched[bg_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.send_sched[bl_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.send_sched[bg_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i));
     }
     for(size_t i=0;i<speed.rec_sched.size();i++)
     {
@@ -409,8 +450,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[dst];
         int bg_p = best_global_position.proc_mappings[dst];
         speed.rec_sched[i] = w_s * speed.rec_sched[i] +
-                                 w_lb * (best_local_position.rec_sched[bl_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i)) +
-                                 w_gb * (best_global_position.rec_sched[bg_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.rec_sched[bl_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.rec_sched[bg_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i));
     }
 }
 void Particle::move() 
@@ -635,22 +676,22 @@ std::ostream& operator<< (std::ostream &out, const Speed &s)
 {
     out << "proc_mappings: ";
     for(auto m : s.proc_mappings)
-        out << m << " ";
+        out << m << ", ";
     out << endl << "proc_modes:";    
     for(auto m : s.proc_modes)
-        out << m << " ";   
+        out << m << ", ";   
     out << endl << "tdmaAlloc:";    
     for(auto t : s.tdmaAlloc)
-        out << t << " ";
+        out << t << ", ";
     out << endl << "proc_sched:";    
     for(auto sc : s.proc_sched)
-        out << sc;
+        out << sc << ", ";
     out << endl << "send_sched:";        
     for(auto se : s.send_sched)
-        out << se;
+        out << se << ", ";
     out << endl << "rec_sched:";        
     for(auto r : s.rec_sched)
-        out << r << " ";        
+        out << r << ", ";        
     return out;
 }
 std::ostream& operator<< (std::ostream &out, const Particle &particle)
@@ -819,14 +860,10 @@ void Schedule::rank_add(vector<float> _speed)
 }
 int Schedule::random_round(float f)
 {
-  random_device rnd_device;
-  uniform_int_distribution<int> dist(0, 1);
-  mt19937 mersenne_engine(rnd_device());  
-  auto gen = std::bind(dist, mersenne_engine);
-  auto tmp = gen();
-  if(tmp == 0)
-      return ceil(f);
-  return floor(f);  
+  if(random_bool())
+    return ceil(f);
+  else    
+    return floor(f);  
 }
 void Schedule::switch_ranks(int i, int j)
 {
@@ -841,19 +878,46 @@ void Schedule::repair_dist()
         int cnt = std::count(rank.begin(), rank.end(), rank[i] );
         if(cnt > 1)
         {
-            ///Find first unused rank
-            size_t j;
-            for(j=0;j<rank.size();j++)
+            if(random_bool())
             {
-                int cnt_j = std::count(rank.begin(), rank.end(), j);
-                if(cnt_j == 0)
+                ///Find first unused rank
+                size_t j;
+                for(j=0;j<rank.size();j++)
                 {
-                    set_rank(i, j);
-                    break;
+                    int cnt_j = std::count(rank.begin(), rank.end(), j);
+                    if(cnt_j == 0)
+                    {
+                        set_rank(i, j);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                ///Find last unused rank
+                size_t j;
+                for(j=rank.size()-1;j>=0;j--)
+                {
+                    int cnt_j = std::count(rank.begin(), rank.end(), j);
+                    if(cnt_j == 0)
+                    {
+                        set_rank(i, j);
+                        break;
+                    }
                 }
             }
                         
         }
     }
 }
-
+bool Schedule::random_bool()
+{
+  random_device rnd_device;
+  uniform_int_distribution<int> dist(0, 1);
+  mt19937 mersenne_engine(rnd_device());  
+  auto gen = std::bind(dist, mersenne_engine);
+  auto tmp = gen();
+  if(tmp == 0)
+      return true;
+  return false;  
+}
