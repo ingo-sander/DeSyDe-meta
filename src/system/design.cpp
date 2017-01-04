@@ -52,7 +52,7 @@ Design::Design(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _applicati
             }
         }
         appIndex.push_back(no_actors-1);
-        sendbufferSz.resize(no_channels,10),
+        sendbufferSz.resize(no_channels,20),
         recbufferSz.resize(no_channels,1);
         init_vectors();    
     }    
@@ -159,14 +159,14 @@ void Design::constructMSAG() {
       srcCh.successor_key = applications->getChannel(i)->source;
       srcCh.delay = wcet[applications->getChannel(i)->source];
       srcCh.min_tok = sendbufferSz[i];
-      srcCh.max_tok = sendbufferSz[i];
+      srcCh.max_tok = INT_MAX;
 
       //add to boost-msag
       src = b::vertex(block_actor, b_msag);
       dst = b::vertex(applications->getChannel(i)->source, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, wcet[applications->getChannel(i)->source]);
-      b::put(b::edge_weight2, b_msag, _e, sendbufferSz[i]);
+      b::put(b::edge_weight2, b_msag, _e, INT_MAX);
 
       n_msagChannels++;
       if(printDebug){
@@ -298,7 +298,7 @@ void Design::constructMSAG() {
       succRec.successor_key = send_actor;
       succRec.delay = sendingTime[i];
       succRec.min_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
-      succRec.max_tok = recbufferSz[i] - applications->getChannel(i)->initTokens;
+      succRec.max_tok = INT_MAX - applications->getChannel(i)->initTokens;
       succRec.channel = i;
 
       //add to boost-msag
@@ -306,7 +306,7 @@ void Design::constructMSAG() {
       dst = b::vertex(send_actor, b_msag);
       b::tie(_e, found) = b::add_edge(src, dst, b_msag);
       b::put(b::edge_weight, b_msag, _e, sendingTime[i]);
-      b::put(b::edge_weight2, b_msag, _e, recbufferSz[i] - applications->getChannel(i)->initTokens);
+      b::put(b::edge_weight2, b_msag, _e, INT_MAX - applications->getChannel(i)->initTokens);
 
       n_msagChannels++;
       if(printDebug)
