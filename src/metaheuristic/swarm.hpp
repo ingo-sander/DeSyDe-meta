@@ -44,17 +44,24 @@ using namespace std;
  */
 struct ParetoFront
 {
-    ParetoFront(int no_obj);
+    ParetoFront();
     vector<Position> pareto;
     /**
-     * returns true if the input position dominates the current position
-     * with respect to objective obj.
+     * Does pareto[indx] dominate p?
      */ 
     bool dominate(Position&, int);
+    /**
+     * Does pareto dominate p?
+     */ 
+    bool dominate(Position& p);
     /**
      * Compares the input position with the current front 
      * and replaces if it dominates
      */ 
+     /**
+     * Does p1 dominate p2?
+     */ 
+    bool dominate(Position& p1, Position& p2);
     bool update_pareto(Position);
     /**
      * @return True if the pareto front is empty.
@@ -89,7 +96,7 @@ private:
     bool stagnation;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    int random_obj();/** returns a random objective. */
+    int random_par();/** returns index of a random pareto. */
     void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
     void update_position(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
