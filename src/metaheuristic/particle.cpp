@@ -1,6 +1,6 @@
 #include "particle.hpp"
 Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
-                    int _objective, float _w_s, float _w_lb, float _w_gb):
+                    int _objective, float _w_t, float _w_lb, float _w_gb):
                     mapping(_mapping),
                     applications(_application),
                     no_entities(mapping->getNumberOfApps()),
@@ -12,11 +12,12 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     current_position(),
                     best_local_position(),
                     best_global_position(),
-                    speed(no_actors, no_channels, no_processors),
-                    w_s(_w_s),
+                    speed(no_actors, no_channels, no_processors),                    
+                    w_t(_w_t),
                     w_lb(_w_lb),
                     w_gb(_w_gb),
-                    no_invalid_moves(0)                    
+                    no_invalid_moves(0),
+                    max_w_t(_w_t)                    
 {   
     init_random();    
 }
@@ -190,7 +191,7 @@ vector<int> Particle::get_channel_by_dst(Position& p, int dst_proc_id) const
 }
 void Particle::init_random()
 {
-    /** clear. */
+    /**  -# Clear vectors. */
     current_position.proc_mappings.clear();
     current_position.proc_modes.clear();
     current_position.tdmaAlloc.clear();
@@ -207,7 +208,7 @@ void Particle::init_random()
     uniform_int_distribution<int> dist_channel(0, no_channels-1);
     uniform_int_distribution<int> dist_tdma(0, no_tdma_slots);
 
-    /// the engine has to be reset after crreating the distribution
+    /// -# The engine has to be reset after crreating the distribution
     auto gen_proc = std::bind(dist_proc, mersenne_engine);mersenne_engine();
     auto gen_tdma = std::bind(dist_proc, mersenne_engine);mersenne_engine();
     
@@ -218,7 +219,7 @@ void Particle::init_random()
     generate(begin(current_position.proc_mappings), end(current_position.proc_mappings), gen_proc); 
     generate(begin(current_position.tdmaAlloc), end(current_position.tdmaAlloc), gen_tdma);
     
-    ///Random proc_modes based on the number of modes for each processors
+    /// -# Random proc_modes based on the number of modes for each processors
     for(size_t i=0;i<no_processors;i++)
     {
        int no_proc_modes = mapping->getPlatform()->getModes(i);
@@ -233,6 +234,7 @@ void Particle::init_random()
 }
 void Particle::repair_tdma(Position& p)
 {
+    p.tdmaAlloc = bring_v_to_bound(p.tdmaAlloc, 0, no_tdma_slots);
     vector<int> no_inout_channels(no_processors, 0);
     ///Random # tdma slots based on src and dst of channels
     for(size_t i=0;i<no_channels;i++)
@@ -260,8 +262,8 @@ void Particle::repair_tdma(Position& p)
         }    
     }
     /**
-     * If the total number of allocated slots is more than the number of 
-     * available slots, then take the difference away from some processors
+     * \note If the total number of allocated slots is more than the number of 
+     * available slots, then take the difference away from some processors.
      */     
     int sum_of_elems = std::accumulate(p.tdmaAlloc.begin(), p.tdmaAlloc.end(), 0);
     int diff = sum_of_elems - no_tdma_slots;
@@ -291,7 +293,7 @@ vector<int> Particle::get_next(vector<Schedule> sched_set, int no_elements)
         }
         low_ranks.push_back(s.get_element_by_rank(0));                    
     }
-    ///Last dummy node should point to the highest rank of the first proc
+    ///\note Last dummy node should point to the highest rank of the first proc.
     next[no_elements+no_processors-1] = low_ranks[0];
     for(size_t i=0;i<low_ranks.size()-1;i++)
     {
@@ -335,10 +337,9 @@ void Particle::calc_fitness()
         best_local_position = current_position;
     }
     if(current_position.fitness[0] < 0)
-        {
-            no_invalid_moves++;
-            //cout << "no_invalid_moves:" << no_invalid_moves << endl;
-        }
+    {
+        no_invalid_moves++;
+    }
     else
         no_invalid_moves = 0;        
     
@@ -355,10 +356,7 @@ Position Particle::get_current_position()
 {
     return current_position;
 }
-Position Particle::get_best_local_position()
-{
-    return best_local_position;
-}
+
 Speed Particle::get_speed()
 {
     return speed;
@@ -367,25 +365,20 @@ void Particle::update_position()
 {   
     
     /**
-     * In case the number of invalid moves is more than the threshold,
+     * \note - In case the number of invalid moves is more than the threshold,
      * then reinitialize the particle.
      */
     if(no_invalid_moves > thr_invalid_mov)  
+    {
         init_random();
-        
-    update_speed();
-    /*
-    if(!best_global_position.empty() && !best_local_position.empty())
-        add_positions(current_position, best_local_position, best_global_position, .3, .3);
-    else
-    {    
-        if(!best_global_position.empty())
-            add_positions(current_position, best_global_position, .5);
-        
-        if(!best_local_position.empty())
-            add_positions(current_position, best_local_position, .5);
-    }*/
+        best_local_position = current_position;
+        w_t = max_w_t;
+    }
+    /// -# Update speed.    
+    update_speed();    
+    /// -# Move the particle based on the speed.
     move();
+    /// -# Repair the particle.
     repair(current_position);    
 }
 float Particle::random_weight()
@@ -408,19 +401,19 @@ void Particle::update_speed()
     
     for(size_t i=0;i<speed.proc_mappings.size();i++)
     {
-        speed.proc_mappings[i] = w_s * speed.proc_mappings[i] +
+        speed.proc_mappings[i] = w_t * speed.proc_mappings[i] +
                                  y1 * w_lb * (best_local_position.proc_mappings[i] - current_position.proc_mappings[i]) +
                                  y2 * w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);
     }
     for(size_t i=0;i<speed.proc_modes.size();i++)
     {
-        speed.proc_modes[i] = w_s * speed.proc_modes[i] +
+        speed.proc_modes[i] = w_t * speed.proc_modes[i] +
                                  y1 * w_lb * (best_local_position.proc_modes[i] - current_position.proc_modes[i]) +
                                  y2 * w_gb * (best_global_position.proc_modes[i] - current_position.proc_modes[i]);
     }
     for(size_t i=0;i<speed.tdmaAlloc.size();i++)
     {
-        speed.tdmaAlloc[i] = w_s * speed.tdmaAlloc[i] +
+        speed.tdmaAlloc[i] = w_t * speed.tdmaAlloc[i] +
                                  y1 * w_lb * (best_local_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]) +
                                  y2 * w_gb *  (best_global_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]);
     }
@@ -429,7 +422,7 @@ void Particle::update_speed()
         int cu_p = current_position.proc_mappings[i];
         int bl_p = best_local_position.proc_mappings[i];
         int bg_p = best_global_position.proc_mappings[i];
-        speed.proc_sched[i] = w_s * speed.proc_sched[i] +
+        speed.proc_sched[i] = w_t * speed.proc_sched[i] +
                                  y1 * w_lb * (best_local_position.proc_sched[bl_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.proc_sched[bg_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i));
     }
@@ -439,7 +432,7 @@ void Particle::update_speed()
         int cu_p = current_position.proc_mappings[src];
         int bl_p = best_local_position.proc_mappings[src];
         int bg_p = best_global_position.proc_mappings[src];
-        speed.send_sched[i] = w_s * speed.send_sched[i] +
+        speed.send_sched[i] = w_t * speed.send_sched[i] +
                                  y1 * w_lb * (best_local_position.send_sched[bl_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.send_sched[bg_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i));
     }
@@ -449,7 +442,7 @@ void Particle::update_speed()
         int cu_p = current_position.proc_mappings[dst];
         int bl_p = best_local_position.proc_mappings[dst];
         int bg_p = best_global_position.proc_mappings[dst];
-        speed.rec_sched[i] = w_s * speed.rec_sched[i] +
+        speed.rec_sched[i] = w_t * speed.rec_sched[i] +
                                  y1 * w_lb * (best_local_position.rec_sched[bl_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.rec_sched[bg_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i));
     }
@@ -471,10 +464,9 @@ void Particle::move()
     }
 
     build_schedules(current_position);
-    /** add proc_sched. */    
+    /** \li Add proc_sched. */    
     for(size_t proc;proc<current_position.proc_sched.size();proc++)
     {
-        ///go through all elemennts in this proc
         for(auto e : current_position.proc_sched[proc].get_elements())
         {
             current_position.proc_sched[proc].set_rank_by_element(e, 
@@ -482,10 +474,9 @@ void Particle::move()
                                             speed.proc_sched[e]) );
         }
     }  
-    /** add send_sched. */  
+    /** \li Add send_sched. */  
     for(size_t proc;proc<current_position.send_sched.size();proc++)
     {
-        ///go through all elemennts in this proc
         for(auto e : current_position.send_sched[proc].get_elements())
         {
             current_position.send_sched[proc].set_rank_by_element(e, 
@@ -493,10 +484,9 @@ void Particle::move()
                                             speed.send_sched[e]) );
         }
     } 
-    /** add rec_sched. */        
+    /** \li Add rec_sched. */        
     for(size_t proc;proc<current_position.rec_sched.size();proc++)
     {
-        ///go through all elemennts in this proc
         for(auto e : current_position.rec_sched[proc].get_elements())
         {
             current_position.rec_sched[proc].set_rank_by_element(e, 
@@ -504,115 +494,15 @@ void Particle::move()
                                             speed.rec_sched[e]) );
         }
     }              
-    
-    
-}
-void Particle::add_positions(Position& p1, const Position& p2, float w) 
-{
-    if(p1.proc_mappings.size() != p2.proc_mappings.size())
-        THROW_EXCEPTION(RuntimeException, "+ operator: proc_mappings have different sizes" );
-    if(p1.proc_modes.size() != p2.proc_modes.size())
-        THROW_EXCEPTION(RuntimeException, "+ operator: proc_modes have different sizes" );
-    if(p1.tdmaAlloc.size() != p2.tdmaAlloc.size())
-        THROW_EXCEPTION(RuntimeException, "+ operator: tdmaAlloc have different sizes" );
-    
-    Position new_p;
-    try
-    {
-        for(size_t i=0;i<p1.proc_mappings.size();i++)
-        {
-            new_p.proc_mappings.push_back(Position::weighted_sum(p1.proc_mappings[i],
-                                            p2.proc_mappings[i], w));            
-        }
-        for(size_t i=0;i<p1.proc_modes.size();i++)
-        {
-            new_p.proc_modes.push_back(Position::weighted_sum(p1.proc_modes[i],
-                                            p2.proc_modes[i], w)); 
-        }
-        for(size_t i=0;i<p1.tdmaAlloc.size();i++)
-        {
-            new_p.tdmaAlloc.push_back(Position::weighted_sum(p1.tdmaAlloc[i],
-                                            p2.tdmaAlloc[i], w)); 
-        }
-
-        build_schedules(new_p);
-        /** add proc_sched. */    
-        for(size_t proc;proc<p1.proc_sched.size();proc++)
-        {
-            ///go through all elemennts in this proc
-            for(auto e : p1.proc_sched[proc].get_elements())
-            {
-                new_p.proc_sched[new_p.proc_mappings[e]].set_rank_by_element(e, 
-                        Position::weighted_sum(p1.proc_sched[proc].get_rank_by_element(e),
-                                     p2.proc_sched[p2.proc_mappings[e]].get_rank_by_element(e), w) );
-            }
-        }  
-        /** add send_sched. */  
-        /** add rec_sched. */        
-        p1 = new_p;                
-    }
-    catch(std::exception const& e)
-    {
-        cout << new_p << endl;
-        THROW_EXCEPTION(RuntimeException, e.what() );
-    }  
-    
-}
-void Particle::add_positions(Position& p1, const Position& p2, Position& p3, float w1, float w2) 
-{
-    if(p1.proc_mappings.size() != p2.proc_mappings.size() || p1.proc_mappings.size() != p3.proc_mappings.size() )
-        THROW_EXCEPTION(RuntimeException, "+ operator: proc_mappings have different sizes" );
-    if(p1.proc_modes.size() != p2.proc_modes.size() || p1.proc_modes.size() != p3.proc_modes.size())
-        THROW_EXCEPTION(RuntimeException, "+ operator: proc_modes have different sizes" );
-    if(p1.tdmaAlloc.size() != p2.tdmaAlloc.size() || p1.tdmaAlloc.size() != p3.tdmaAlloc.size() )
-        THROW_EXCEPTION(RuntimeException, "+ operator: tdmaAlloc have different sizes" );
-    
-    Position new_p;
-    try
-    {
-        for(size_t i=0;i<p1.proc_mappings.size();i++)
-        {
-            new_p.proc_mappings.push_back(Position::weighted_sum(p1.proc_mappings[i],
-                                            p2.proc_mappings[i], p3.proc_mappings[i], w1, w2));            
-        }
-        for(size_t i=0;i<p1.proc_modes.size();i++)
-        {
-            new_p.proc_modes.push_back(Position::weighted_sum(p1.proc_modes[i],
-                                            p2.proc_modes[i], p3.proc_modes[i], w1, w2)); 
-        }
-        for(size_t i=0;i<p1.tdmaAlloc.size();i++)
-        {
-            new_p.tdmaAlloc.push_back(Position::weighted_sum(p1.tdmaAlloc[i],
-                                            p2.tdmaAlloc[i], p3.tdmaAlloc[i], w1, w2)); 
-        }
-
-        build_schedules(new_p);
-        /** add proc_sched. */    
-        for(size_t proc;proc<p1.proc_sched.size();proc++)
-        {
-            ///go through all elemennts in this proc
-            for(auto e : p1.proc_sched[proc].get_elements())
-            {
-                new_p.proc_sched[new_p.proc_mappings[e]].set_rank_by_element(e, 
-                        Position::weighted_sum(p1.proc_sched[proc].get_rank_by_element(e),
-                                     p2.proc_sched[p2.proc_mappings[e]].get_rank_by_element(e),
-                                     p3.proc_sched[p3.proc_mappings[e]].get_rank_by_element(e), w1, w2) );
-            }
-        }        
-        p1 = new_p;                
-    }
-    catch(std::exception const& e)
-    {
-        cout << new_p << endl;
-        THROW_EXCEPTION(RuntimeException, e.what() );
-    }
-    
+    /** \li Decrease w_t.*/
+    if(w_t - delta_w_t > min_w_t)
+        w_t = w_t - delta_w_t;
     
 }
 bool Particle::dominate(vector<int> f)
 {
     /**
-     * if best_local is empty
+     * If best_local is empty
      * Or
      * it is an illegal position, i.e. throughput is negative and the new position is legal
      * then return true 
@@ -671,6 +561,12 @@ int Particle::bring_to_bound(int v, int l, int u)
 int Particle::get_objective()
 {
     return objective;
+}
+void Particle::avoid_stagnation()
+{
+    w_t = max_w_t;
+    for(size_t i=0;i<speed.proc_mappings.size();i++)
+        speed.proc_mappings[i] += 1 ? Schedule::random_bool() : -1;
 }
 std::ostream& operator<< (std::ostream &out, const Speed &s)
 {
@@ -830,7 +726,7 @@ vector<int> Schedule::get_next()
 int Schedule::get_element_by_rank(int _rank) const
 {
     /**
-     * if _rank is the largest rank, then we return the dummy ellement.
+     * If _rank is the largest rank, then we return the dummy ellement.
      * othersiwe we find the element with the given rank.
      */ 
     if(_rank == (int) rank.size())

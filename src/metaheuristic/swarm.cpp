@@ -7,8 +7,18 @@ Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application
                     no_particles(no_objectives*cfg.settings().particle_per_obj),
                     no_generations(cfg.settings().generation),
                     no_threads(std::thread::hardware_concurrency()),
-                    par_f(no_objectives)
+                    par_f(no_objectives),
+                    stagnation(false)
 {   
+    particle_per_thread = no_particles / no_threads;
+}
+Swarm::~Swarm()
+{
+    particle_set.clear();
+}
+void Swarm::init()
+{
+    particle_set.clear();
     for(size_t i=0;i<no_particles;i++)
     {
         shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
@@ -16,15 +26,10 @@ Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application
                                 cfg.settings().w_individual, cfg.settings().w_social));        
         particle_set.push_back(p);
     }    
-    particle_per_thread = no_particles / no_threads;
-}
-Swarm::~Swarm()
-{
-    particle_set.clear();
 }
 void Swarm::search()
 {
-    out.open(cfg.settings().output_path+"out/out.txt");
+    out.open(cfg.settings().output_path+"out/out_meta.txt");
     
     auto last_update = 0;
     t_start = runTimer::now();
@@ -36,6 +41,12 @@ void Swarm::search()
     while(g - last_update < no_generations)
     {
         LOG_INFO("Generation "+tools::toString(g)+" last_update "+tools::toString(last_update));
+        if(par_f.empty())
+            init();
+        if(g - last_update > no_generations/2)
+            stagnation = true;
+        else
+            stagnation = false;        
         auto start_fitness = runTimer::now();
         for (int i = 0; i < no_threads; i++) 
         {
@@ -58,7 +69,6 @@ void Swarm::search()
         {
             if(par_f.update_pareto(p->get_current_position()))
                 last_update = g;
-            //cout << tools::toString(p->get_current_position().fitness) << endl;
         }
         cout << "pareto front--------------------------\n"
              << par_f << endl;  
@@ -122,6 +132,10 @@ ParetoFront::ParetoFront(int no_obj)
     for(int i=0;i<no_obj;i++)
         pareto.push_back(Position());
 }
+bool ParetoFront::empty()
+{
+    return pareto[0].empty();
+}
 std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
 {
     for(auto po : p.pareto)
@@ -174,15 +188,18 @@ void Swarm::update_position(int t_id)
     int end_id = start_id + particle_per_thread;
     if(t_id == no_threads -1)///Last thread takes care of all remaining particles
         end_id = no_particles;
-        
     for(int i=start_id;i<end_id;i++)    
     {
-        int obj = particle_set[i]->get_objective();//random_obj();
+        int obj = particle_set[i]->get_objective();
+        //int obj = random_obj();
         if(!par_f.pareto[obj].empty())
         {
             particle_set[i]->set_best_global(par_f.pareto[obj]);
+            if(stagnation)
+                particle_set[i]->avoid_stagnation();
             particle_set[i]->update_position();
         }
     }
     
 }
+

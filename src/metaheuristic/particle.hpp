@@ -35,17 +35,30 @@
 #include "../system/design.hpp"
 using namespace std;
 
+/**
+ * \class Schedule
+ *
+ * \brief Stores Schedules.
+ * 
+ * Each element is associated with a rank which is the order of that 
+ * element in the order-based schedule.
+ *
+ */
 class Schedule{
 public:
-    Schedule(vector<int>, int);/** creates a random schedule out of input elements and dummy node. */
+    /** Creates a random schedule out of input elements and dummy node. */
+    Schedule(vector<int>, int);
     friend std::ostream& operator<< (std::ostream &out, const Schedule &sched);
     void set_rank(int index, int value);
     void set_rank(vector<int> _rank);
     vector<int> get_rank();
     vector<int> get_next();
-    vector<int> rank_diff(vector<int>);/** element-wise difference of rank and input vector. */
-    void rank_add(vector<float>);/** addes the rank with the input (speed). */
-    static int random_round(float);/** randomly slecets ceil or floor. */
+    /** Element-wise difference of rank and input vector. */
+    vector<int> rank_diff(vector<int>);
+    /** Addes the rank with the input (speed). */
+    void rank_add(vector<float>);
+    /** Randomly slecets ceil or floor. */
+    static int random_round(float);
     static bool random_bool();
     int get_next(int);
     void switch_ranks(int, int);    
@@ -79,6 +92,12 @@ private:
      */ 
     void repair_dist();    
 };
+/**
+ * \class Speed
+ *
+ * \brief Stores speed of the particles (\f$ V(t) \f$).
+ *
+ */
 struct Speed{
     Speed(int no_actors, int no_channels, int no_processors)
     {
@@ -97,6 +116,11 @@ struct Speed{
     vector<float> tdmaAlloc;
     friend std::ostream& operator<< (std::ostream &out, const Speed &s);
 };
+/**
+ * \class Position
+ *
+ * \brief Stores the position of particles.
+ */
 struct Position{
 public:    
    ~Position()
@@ -152,60 +176,156 @@ public:
  
   
 };
+/**
+ * \class Particle
+ *
+ * \brief The particle class in PSO.
+ *
+ * This class abstracts a particle. Note that each particle contains 
+ * 3 positions: (1) current position; (2) best local position, i.e., 
+ * individual memory; (3) best global position, i.e., social memory.
+ *
+ * \note Each particle searchs for a particular objective.
+ * \note The objective is set at the initialization. 
+ *
+ */
 class Particle{
-public: 
+public:
+    /**
+     * Constructor method.
+     * @param _mapping
+     *        Pointer to the mapping object.
+     * @param _application
+     *        Pointer to the application object.
+     * @param _objective
+     *        Particle objective.
+     * @param _w_t
+     *        Maximum and initial weight of the current speed \c w_t.
+     * @param _w_lb
+     *        Weight of individual memory.
+     * @param _w_gb
+     *        Weight of social memory.
+     */ 
     Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float);
     /** 
-     * Returns the fitness value of the particle with respect to different objectives.
+     * Returns the fitness value of the current position of the particle.
+     * @return Vector of fitness values for all aobjectives.
      */ 
     vector<int> get_fitness();
+    /** Calculate the fitness of the current position.*/
     void calc_fitness();
+    /** Create the next vector for a vector of schedule objects which 
+     * can be either proc_sched, next_sched or rec_sched.
+     * @param no_elements
+     *        The number of elements in the schedule.
+     * @return Next vector.
+     */ 
     vector<int> get_next(vector<Schedule>, int);
+    /** 
+     * The swarm object uses this function to update the social memory.
+     * The particle keeps a copy of the best global position.
+     * @param position 
+     *        \c Position object.
+     */   
     void set_best_global(Position);
+    /**
+     * Returns the current position of the particle.
+     * @return position
+     *         \c Position object.
+     */ 
     Position get_current_position();
-    Position get_best_local_position();
-    void update_position();/** updates the current position based on the local best and global best.*/
-    void move() ;
+    /** Updates the current position based on the local best and global best.*/
+    void update_position();
+    /**
+     * This is used by swarm in order to see which social memory is 
+     * relevant for the particle.
+     * @return \c objective of the particle.
+     */ 
     int get_objective();
+    /**
+     * @return the speed of the objective.
+     */ 
     Speed get_speed();
+    /**
+     * Implements a strategy to avoid stagnation.
+     */
+    void avoid_stagnation(); 
+    /**
+     * Overloads the << operator.
+     */      
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);    
 private:    
-    shared_ptr<Mapping> mapping;
-    shared_ptr<Applications> applications;
-    const size_t no_entities; /**< total number of actors and tasks. */
-    const size_t no_actors; /**< total number of actors and tasks. */
-    const size_t no_channels; /**< total number of channels. */
-    const size_t no_processors; /**< total number of processors. */
-    const size_t no_tdma_slots; /**< total number of TDMA slots. */
-    const int objective;/** objective of the particle. */
-    Position current_position;
-    Position best_local_position;
-    Position best_global_position;
-    Speed speed;
-    float w_s;/**< weight of current speed. */
-    float w_lb;/**< weight of local best.*/
-    float w_gb;/**< weight of global best.*/
-    int no_invalid_moves;
-    const int thr_invalid_mov = 30;
-    void init_random();
-    void build_schedules(Position&);/** builds proc_sched, send_sched and rec_sched based on the mappings.*/        
-    void repair_tdma(Position&);
-    void repair_sched(Position&);
-    void repair_send_sched(Position&);
-    void repair_rec_sched(Position&);    
-    void repair(Position&);
+    shared_ptr<Mapping> mapping;/*!< Pointer to \c Mapping object.*/
+    shared_ptr<Applications> applications;/*!< Pointer to \c Application object.*/
+    const size_t no_entities; /*!< Total number of actors and tasks. */
+    const size_t no_actors; /*!< Total number of actors and tasks. */
+    const size_t no_channels; /*!< Total number of channels. */
+    const size_t no_processors; /*!< Total number of processors. */
+    const size_t no_tdma_slots; /*!< Total number of TDMA slots. */
+    const int objective;/*!< Objective of the particle. */
+    Position current_position;/*!< Current \c position.*/
+    Position best_local_position;/*!< Individual memory.*/
+    Position best_global_position;/*!< Social memory.*/
+    Speed speed;/*!< Particle \c speed \f$ V(t) \f$.*/
+    float w_t;/*!< Weight of current speed. \f$ w \f$ in \ref update_speed. */
+    float w_lb;/*!< Weight of local best. \f$ c_1 \f$ in \ref update_speed. */
+    float w_gb;/*!< Weight of global best.\f$ c_2 \f$ in \ref update_speed. */
+    int no_invalid_moves;/*!< Number of moves in which the schedule resulted in deadlock (negative fitness).*/
+    const int thr_invalid_mov = 30;/*!< Threshold for the number of invalid moves.*/
+    const float delta_w_t = 0.05; /*!< Delta for decreasing \c w_t.*/
+    const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
+    const float max_w_t;/*!< Maximum \c w_t.*/ 
+    void init_random();/*!< Randomly initializes the particle.*/
+    void build_schedules(Position&);/*!< builds proc_sched, send_sched and rec_sched based on the mappings.*/        
+    void repair_tdma(Position&);/*!< Repairs the \c tdmaAlloc vector in \ref Position.*/
+    void repair_sched(Position&);/*!< Repairs the \c proc_sched in \ref Position.*/
+    void repair_send_sched(Position&);/*!< Repairs the \c send_sched in \ref Position.*/
+    void repair_rec_sched(Position&);/*!< Repairs the \c rec_sched in \ref Position.*/
+    void repair(Position&);/*!< Calls all other repair functions.*/
+    /**
+     * Updates the speed of the particle using the following equation:
+     * \f[
+     * V(t+1) = wV(t) + c_1 y_1 (X(t)-Y(t)) + c_2 y_2 (X(t)-Y(t))
+     * \f]
+     */ 
     void update_speed();
+    void move();/*!< Moves the particle \f$ X(t+1) = X(t)+V(t+1) \f$.*/
+    /**
+     * @param src_proc_id Processor of the source of the channels.
+     * @return Vector of channels where \c source is on \c src_proc_id.
+     */ 
     vector<int> get_channel_by_src(Position&, int) const;
+    /**
+     * @param dst_proc_id Processor of the destination of the channels.
+     * @return Vector of channels where \c destination is on \c dst_proc_id.
+     */ 
     vector<int> get_channel_by_dst(Position&, int) const;    
     /**
-     * Adds position p2 to p1.
-     * Uses the weight in adding.
+     * Compares \c f with the individual memory #best_local_position.
+     * @return true if \c f is better than #best_local_position with 
+     * respect to #objective and false otherwise.
+     * @param f Fitness vector.
      */ 
-    void add_positions(Position& p1, const Position& p2, float w) ;
-    void add_positions(Position& p1, const Position& p2, Position& p3, float w1, float w2) ;
     bool dominate(vector<int> f);
+    /**
+     * Moves \c v to a value between \c l and \c u.
+     * @param v Value.
+     * @param l Lower bound.
+     * @param u Upper bound.
+     * @return in bound value.
+     */ 
     int bring_to_bound(int, int, int);
+    /**
+     * Moves all values in \c v in bound.
+     * @param v Vector of values.
+     * @return in bound vector.
+     */ 
     vector<int> bring_v_to_bound(vector<int>, int, int);
+    /**
+     * Creates a random weight between 0 and 1 which is 
+     * used by \ref update_speed function.
+     * @return Random number between 0 and 1.
+     */ 
     float random_weight();
 };
 

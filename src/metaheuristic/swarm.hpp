@@ -36,7 +36,12 @@
 #include "../exceptions/runtimeexception.h"
 #include "particle.hpp"
 using namespace std;
-
+/**
+ * \class ParetoFront
+ *
+ * \brief Stores the pareto front of the \ref Swarm.
+ *
+ */
 struct ParetoFront
 {
     ParetoFront(int no_obj);
@@ -51,8 +56,18 @@ struct ParetoFront
      * and replaces if it dominates
      */ 
     bool update_pareto(Position);
+    /**
+     * @return True if the pareto front is empty.
+     */ 
+    bool empty();
     friend std::ostream& operator<< (std::ostream &out, const ParetoFront &p);
 };
+/**
+ * \class Swarm
+ *
+ * \brief The swarm class in PSO.
+ *
+ */
 class Swarm{
 public: 
     Swarm(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
@@ -71,10 +86,12 @@ private:
     int particle_per_thread;
     ParetoFront par_f;
     ofstream out;
+    bool stagnation;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
     int random_obj();/** returns a random objective. */
     void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
     void update_position(int);/** updates the best position of particles in a thread. */ 
+    void init();/*!< Initializes the particles. */    
 };
 
