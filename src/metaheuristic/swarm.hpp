@@ -94,6 +94,7 @@ private:
     ParetoFront par_f;
     ofstream out;
     bool stagnation;
+    const bool multi_obj = false;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
     int random_par();/** returns index of a random pareto. */

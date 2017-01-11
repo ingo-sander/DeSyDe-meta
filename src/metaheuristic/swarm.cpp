@@ -1,4 +1,5 @@
 #include "swarm.hpp"
+#include "plot.cpp"
 Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& _cfg):
                     cfg(_cfg),
                     mapping(_mapping),
@@ -23,7 +24,8 @@ void Swarm::init()
     {
         shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
                                 cfg.settings().w_current, 
-                                cfg.settings().w_individual, cfg.settings().w_social));        
+                                cfg.settings().w_individual, cfg.settings().w_social,
+                                cfg.settings().multi_obj));        
         particle_set.push_back(p);
     }    
 }
@@ -116,6 +118,31 @@ void Swarm::search()
    for(auto p : particle_set)
         out << p->get_speed() << endl << sep << endl;
    out.close();
+   
+   vector<vector<int>> data;
+   for(auto p : par_f.pareto)
+   {
+       vector<int> tmp;
+       tmp.push_back(p.fitness_func());
+       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
+       data.push_back(tmp);
+   }
+   std::sort (data.begin(), data.end()); 
+   vector<string> titles;
+   titles.push_back("fitness");    
+   for(int i=0;i<mapping->getNumberOfApps();i++)
+       titles.push_back("app"+tools::toString(i));
+   titles.push_back("energy");    
+   titles.push_back("memory");
+   Plot pl(titles, data);    
+   ofstream out_csv, out_tex;
+   out_csv.open(cfg.settings().output_path+"out/data.csv");
+   out_csv << pl.csv;
+   out_csv.close();
+   out_tex.open(cfg.settings().output_path+"out/plot.tex");
+   out_tex << pl.tex;
+   out_tex.close();
+   
 }
 std::ostream& operator<< (std::ostream &out, const Swarm &swarm)
 {
@@ -141,12 +168,14 @@ bool ParetoFront::empty()
 std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
 {
     for(auto po : p.pareto)
-        out << tools::toString(po.fitness) << endl;
+        out << tools::toString(po.fitness_func()) << " " 
+            << tools::toString(po.fitness) 
+            << endl;
     return out;    
 }
 /**
  * Does pareto[indx] dominate p?
- */ 
+*/
 bool ParetoFront::dominate(Position& p, int indx)
 {
     if(p.empty())
@@ -158,11 +187,12 @@ bool ParetoFront::dominate(Position& p, int indx)
     if(pareto.empty())    
         return false;
         
-    return dominate(pareto[indx], p);        
-}
+    //return dominate(pareto[indx], p);        
+    return p.dominate(pareto[indx]);
+} 
 /**
  * Does p1 dominate p2?
- */ 
+ 
 bool ParetoFront::dominate(Position& p1, Position& p2)
 {
     for(size_t i=0;i<p1.fitness.size();i++)
@@ -171,7 +201,7 @@ bool ParetoFront::dominate(Position& p1, Position& p2)
             return false;
     }
     return true;
-}
+} */
 bool ParetoFront::dominate(Position& p)
 {
     /// -# when pareto is empty directly call dominate for indx=0
@@ -179,8 +209,10 @@ bool ParetoFront::dominate(Position& p)
             return dominate(p, 0);
     for(size_t i=0;i<pareto.size();i++)
     {
-        if(dominate(p, i))
-            return true;
+        if(pareto[i].dominate(p) || pareto[i] == p)
+        {
+             return true;
+        }
     }
     return false;
 }
@@ -191,10 +223,10 @@ bool ParetoFront::update_pareto(Position p)
     {
         for(size_t i=0;i<pareto.size();i++)
         {
-            if(dominate(p, pareto[i]))
+            if(p.dominate(pareto[i]))
             {
                  pareto.erase (pareto.begin()+i);
-            }
+            }           
         }
         pareto.push_back(p);
         is_updated = true;
@@ -210,7 +242,7 @@ void Swarm::calc_fitness(int t_id)
         end_id = no_particles;
     for(int i=start_id;i<end_id;i++)    
     {
-        particle_set[i]->calc_fitness();
+        particle_set[i]->calc_fitness();        
     }
 }
 void Swarm::update_position(int t_id)
@@ -221,13 +253,14 @@ void Swarm::update_position(int t_id)
         end_id = no_particles;
     for(int i=start_id;i<end_id;i++)    
     {
-        //int obj = particle_set[i]->get_objective();
         int par_indx = random_par();        
         if(!par_f.pareto.empty())
         {
             particle_set[i]->set_best_global(par_f.pareto[par_indx]);
             if(stagnation)
-                particle_set[i]->avoid_stagnation();
+            {
+                particle_set[i]->avoid_stagnation();                
+            }
             particle_set[i]->update_position();
         }
     }

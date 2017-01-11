@@ -122,13 +122,18 @@ struct Speed{
  * \brief Stores the position of particles.
  */
 struct Position{
-public:    
+public:
+    Position(bool _multi_obj):
+            multi_obj(_multi_obj)
+            {
+            };
    ~Position()
     {
         proc_sched.clear();
         send_sched.clear();
         rec_sched.clear();            
     }
+    bool multi_obj;
     vector<Schedule> proc_sched;
     vector<Schedule> send_sched;
     vector<Schedule> rec_sched;
@@ -139,12 +144,54 @@ public:
     vector<int> fitness;
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
+    Position(const Position &obj) 
+    {
+        multi_obj = obj.multi_obj;
+        proc_mappings = obj.proc_mappings;
+        proc_modes = obj.proc_modes;
+        tdmaAlloc = obj.tdmaAlloc;
+        proc_sched = obj.proc_sched;
+        send_sched = obj.send_sched;
+        rec_sched = obj.rec_sched;
+        fitness = obj.fitness;                 
+    }
+    void print_multi_obj()
+    {
+        if(multi_obj)
+        {
+            cout << "multi objective\n";
+            return;
+        }
+        if(!multi_obj)
+        {
+            cout << "single objective\n";    
+            return;
+        }
+        cout << "unknown objective\n";    
+    }
+    bool operator==(const Position& p_in)
+    {
+        if(multi_obj)
+        {
+            for(size_t i=0;i<fitness.size();i++)
+            {
+                if(fitness[i] != p_in.fitness[i])
+                    return false;
+            }
+            return true;
+        }
+        else
+        {
+            return (fitness_func() == p_in.fitness_func());
+        }
+    }
     Position& operator=(const Position& p)
     {
         proc_mappings = p.proc_mappings;
         proc_modes = p.proc_modes;
         tdmaAlloc = p.tdmaAlloc;
         fitness = p.fitness;
+        multi_obj = p.multi_obj;
         proc_sched.clear();
         send_sched.clear();
         rec_sched.clear();
@@ -157,10 +204,57 @@ public:
         return *this;
     }
    
- 
+    /**
+     * Do I dominate p_in?
+     */ 
+    bool dominate(Position& p_in)
+    {
+        if(empty())
+            return false;
+        /** -# fitness can not be negative. */            
+        if(invalid())
+            return false;      
+            
+        if(p_in.empty() || p_in.invalid())
+            return true;
+                  
+        if(multi_obj)
+        {
+            for(size_t i=0;i<fitness.size();i++)
+            {
+                if(fitness[i] > p_in.fitness[i])
+                    return false;
+            }
+            return true;
+        }
+        else
+        {
+            if(fitness_func() < p_in.fitness_func())
+                return true;
+            else
+                return false;    
+        }
+    }
+    float fitness_func() const
+    {
+        float w = 1.0/fitness.size();
+        float f = 0;
+        for(auto fit : fitness)
+            f += (float) fit * w;
+        
+        return f;
+    }
     bool empty() const
     {
         return fitness.empty();
+    }
+    bool invalid() const
+    {
+        for(auto f : fitness)
+            if(f < 0)
+                return true;   
+       
+       return false;         
     }
     static int weighted_sum(int a, int b, float w) 
     {
@@ -206,7 +300,7 @@ public:
      * @param _w_gb
      *        Weight of social memory.
      */ 
-    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float);
+    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool);
     /** 
      * Returns the fitness value of the current position of the particle.
      * @return Vector of fitness values for all aobjectives.
@@ -275,6 +369,7 @@ private:
     const float delta_w_t = 0.05; /*!< Delta for decreasing \c w_t.*/
     const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
     const float max_w_t;/*!< Maximum \c w_t.*/ 
+    const bool multi_obj;/*!< True if we are solving a multiobjective optimization problem.*/
     void init_random();/*!< Randomly initializes the particle.*/
     void build_schedules(Position&);/*!< builds proc_sched, send_sched and rec_sched based on the mappings.*/        
     void repair_tdma(Position&);/*!< Repairs the \c tdmaAlloc vector in \ref Position.*/

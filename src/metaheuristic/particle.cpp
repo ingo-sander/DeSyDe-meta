@@ -1,6 +1,6 @@
 #include "particle.hpp"
 Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
-                    int _objective, float _w_t, float _w_lb, float _w_gb):
+                    int _objective, float _w_t, float _w_lb, float _w_gb, bool _multi_obj):
                     mapping(_mapping),
                     applications(_application),
                     no_entities(mapping->getNumberOfApps()),
@@ -9,16 +9,20 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     no_processors(mapping->getPlatform()->nodes()),
                     no_tdma_slots(mapping->getPlatform()->tdmaSlots()),
                     objective(_objective),
-                    current_position(),
-                    best_local_position(),
-                    best_global_position(),
+                    current_position(_multi_obj),
+                    best_local_position(_multi_obj),
+                    best_global_position(_multi_obj),
                     speed(no_actors, no_channels, no_processors),                    
                     w_t(_w_t),
                     w_lb(_w_lb),
                     w_gb(_w_gb),
                     no_invalid_moves(0),
-                    max_w_t(_w_t)                    
+                    max_w_t(_w_t),
+                    multi_obj(_multi_obj)                    
 {   
+    current_position.multi_obj = multi_obj;
+    best_local_position.multi_obj = multi_obj;
+    best_global_position.multi_obj = multi_obj;
     init_random();    
 }
 void Particle::build_schedules(Position& p)
@@ -226,8 +230,7 @@ void Particle::init_random()
        std::uniform_int_distribution<int> uni_dist(0,no_proc_modes-1);
        current_position.proc_modes[i] = uni_dist(mersenne_engine);       
     }
-    
-    
+        
     build_schedules(current_position);
     current_position.fitness.resize(no_entities + 2,0);///energy + memory violations + throughputs    
     repair(current_position);         
@@ -332,7 +335,7 @@ void Particle::calc_fitness()
         cout << *this << endl;
         THROW_EXCEPTION(RuntimeException, e.what() );
     }
-    if(dominate(current_position.fitness))
+    if(current_position.dominate(best_local_position) || best_local_position.empty())
     {   
         best_local_position = current_position;
     }
@@ -564,9 +567,11 @@ int Particle::get_objective()
 }
 void Particle::avoid_stagnation()
 {
-    w_t = max_w_t;
+    //w_t = max_w_t;
     for(size_t i=0;i<speed.proc_mappings.size();i++)
         speed.proc_mappings[i] += 1 ? Schedule::random_bool() : -1;
+    for(size_t i=0;i<speed.proc_modes.size();i++)
+        speed.proc_modes[i] += 1 ? Schedule::random_bool() : -1;    
 }
 std::ostream& operator<< (std::ostream &out, const Speed &s)
 {
