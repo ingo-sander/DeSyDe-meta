@@ -168,7 +168,11 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
       ("meta.w_current",
           po::value<float>()->default_value(0.25)->notifier(
               boost::bind(&Config::setWeightCur, this, _1)),
-          "Weight of the current position.");
+          "Weight of the current position.")
+      ("meta.multi_obj",
+          po::value<bool>()->default_value(true)->notifier(
+              boost::bind(&Config::setMultiObj, this, _1)),
+          "whether multiobjective optimization or not.");    
   
   
   po::variables_map vm;
@@ -503,6 +507,9 @@ void Config::setWeightSoc(float w) throw (InvalidFormatException){
 }
 void Config::setWeightCur(float w) throw (InvalidFormatException){
   settings_.w_current = w;
+}
+void Config::setMultiObj(bool b) throw (InvalidFormatException){
+  settings_.multi_obj = b;
 }
 shared_ptr<Config::PresolverResults> Config::getPresolverResults(){
   if(!pre_results)  
