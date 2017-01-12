@@ -25,7 +25,7 @@ void Swarm::init()
         shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
                                 cfg.settings().w_current, 
                                 cfg.settings().w_individual, cfg.settings().w_social,
-                                cfg.settings().multi_obj));        
+                                cfg.settings().multi_obj, cfg.settings().fitness_weights));        
         particle_set.push_back(p);
     }    
 }
@@ -131,7 +131,7 @@ void Swarm::search()
    vector<string> titles;
    titles.push_back("fitness");    
    for(int i=0;i<mapping->getNumberOfApps();i++)
-       titles.push_back("app"+tools::toString(i));
+       titles.push_back("app"+tools::toString(i)+"-period");
    titles.push_back("energy");    
    titles.push_back("memory");
    Plot pl(titles, data);    

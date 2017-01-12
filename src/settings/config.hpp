@@ -119,6 +119,7 @@ public:
    float  w_social;
    float  w_current;
    bool   multi_obj;
+   vector<float> fitness_weights;
   };
   struct PresolverResults{
     size_t it_mapping; /**< Informs the CP model how to use oneProcMappings: <.size(): Enforce mapping, >=.size() Forbid all. */
@@ -191,6 +192,7 @@ private:
   void setWeightSoc(float) throw (InvalidFormatException);
   void setWeightCur(float) throw (InvalidFormatException);
   void setMultiObj(bool) throw (InvalidFormatException);
+  void setFitW(vector<float>) throw (InvalidFormatException);
 
 };
 

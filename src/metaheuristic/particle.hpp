@@ -123,8 +123,9 @@ struct Speed{
  */
 struct Position{
 public:
-    Position(bool _multi_obj):
-            multi_obj(_multi_obj)
+    Position(bool _multi_obj, vector<float> _w):
+            multi_obj(_multi_obj),
+            weights(_w)
             {
             };
    ~Position()
@@ -142,6 +143,7 @@ public:
     vector<int> tdmaAlloc;     
     vector<int> get_actors_by_proc(int) const;    
     vector<int> fitness;
+    vector<float> weights;
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
     Position(const Position &obj) 
@@ -153,7 +155,8 @@ public:
         proc_sched = obj.proc_sched;
         send_sched = obj.send_sched;
         rec_sched = obj.rec_sched;
-        fitness = obj.fitness;                 
+        fitness = obj.fitness;   
+        weights = obj.weights;              
     }
     void print_multi_obj()
     {
@@ -191,6 +194,7 @@ public:
         proc_modes = p.proc_modes;
         tdmaAlloc = p.tdmaAlloc;
         fitness = p.fitness;
+        weights = p.weights;
         multi_obj = p.multi_obj;
         proc_sched.clear();
         send_sched.clear();
@@ -237,10 +241,9 @@ public:
     }
     float fitness_func() const
     {
-        float w = 1.0/fitness.size();
-        float f = 0;
-        for(auto fit : fitness)
-            f += (float) fit * w;
+        float f;
+        for(size_t i=0;i<weights.size();i++)
+            f += (float) fitness[i] * weights[i];
         
         return f;
     }
@@ -300,7 +303,7 @@ public:
      * @param _w_gb
      *        Weight of social memory.
      */ 
-    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool);
+    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool, vector<float>);
     /** 
      * Returns the fitness value of the current position of the particle.
      * @return Vector of fitness values for all aobjectives.
@@ -370,6 +373,7 @@ private:
     const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
     const float max_w_t;/*!< Maximum \c w_t.*/ 
     const bool multi_obj;/*!< True if we are solving a multiobjective optimization problem.*/
+    vector<float> fitness_weights;
     void init_random();/*!< Randomly initializes the particle.*/
     void build_schedules(Position&);/*!< builds proc_sched, send_sched and rec_sched based on the mappings.*/        
     void repair_tdma(Position&);/*!< Repairs the \c tdmaAlloc vector in \ref Position.*/

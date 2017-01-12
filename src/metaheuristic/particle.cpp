@@ -1,6 +1,7 @@
 #include "particle.hpp"
 Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
-                    int _objective, float _w_t, float _w_lb, float _w_gb, bool _multi_obj):
+                    int _objective, float _w_t, float _w_lb, float _w_gb, 
+                    bool _multi_obj, vector<float> _f_w):
                     mapping(_mapping),
                     applications(_application),
                     no_entities(mapping->getNumberOfApps()),
@@ -9,20 +10,23 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     no_processors(mapping->getPlatform()->nodes()),
                     no_tdma_slots(mapping->getPlatform()->tdmaSlots()),
                     objective(_objective),
-                    current_position(_multi_obj),
-                    best_local_position(_multi_obj),
-                    best_global_position(_multi_obj),
+                    current_position(_multi_obj, _f_w),
+                    best_local_position(_multi_obj, _f_w),
+                    best_global_position(_multi_obj, _f_w),
                     speed(no_actors, no_channels, no_processors),                    
                     w_t(_w_t),
                     w_lb(_w_lb),
                     w_gb(_w_gb),
                     no_invalid_moves(0),
                     max_w_t(_w_t),
-                    multi_obj(_multi_obj)                    
+                    multi_obj(_multi_obj),
+                    fitness_weights(_f_w)
+                                        
 {   
-    current_position.multi_obj = multi_obj;
-    best_local_position.multi_obj = multi_obj;
-    best_global_position.multi_obj = multi_obj;
+    if(fitness_weights.size() != no_entities + 2)
+        THROW_EXCEPTION(RuntimeException, tools::toString(no_entities + 2) +
+                        " fitness_weights needed while " + tools::toString(fitness_weights.size()) +
+                        " provided");
     init_random();    
 }
 void Particle::build_schedules(Position& p)

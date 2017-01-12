@@ -129,7 +129,7 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
               boost::bind(&Config::setLubyScale, this, _1)),
           "Luby scale")      
       ("dse.th_prop",
-          po::value<string>()->default_value(string("SSE"))->notifier(
+          po::value<string>()->default_value(string("MCR"))->notifier(
               boost::bind(&Config::setThPropagator, this, _1)),
           "Throughput propagator type.\n"
           "Valid options SSE, MCR. ");
@@ -158,21 +158,26 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
               boost::bind(&Config::setNoParticles, this, _1)),
           "Number of particles per objective used in the search.")
       ("meta.w_individual",
-          po::value<float>()->default_value(.5)->notifier(
+          po::value<float>()->default_value(2.5)->notifier(
               boost::bind(&Config::setWeightInd, this, _1)),
           "Weight of the individual component.")
       ("meta.w_social",
-          po::value<float>()->default_value(0.25)->notifier(
+          po::value<float>()->default_value(2.25)->notifier(
               boost::bind(&Config::setWeightSoc, this, _1)),
           "Weight of the social component.")
       ("meta.w_current",
-          po::value<float>()->default_value(0.25)->notifier(
+          po::value<float>()->default_value(1.5)->notifier(
               boost::bind(&Config::setWeightCur, this, _1)),
           "Weight of the current position.")
       ("meta.multi_obj",
           po::value<bool>()->default_value(true)->notifier(
               boost::bind(&Config::setMultiObj, this, _1)),
-          "whether multiobjective optimization or not.");    
+          "Whether multiobjective optimization or not.")
+      ("meta.fitness_weights",
+          po::value<vector<float>>()->multitoken()->notifier(
+              boost::bind(&Config::setFitW, this, _1)),
+          "The weight vector used for calculating the fitness."
+          "First wieght of application periods, then energy, last memory violations");
   
   
   po::variables_map vm;
@@ -510,6 +515,9 @@ void Config::setWeightCur(float w) throw (InvalidFormatException){
 }
 void Config::setMultiObj(bool b) throw (InvalidFormatException){
   settings_.multi_obj = b;
+}
+void Config::setFitW(vector<float> w) throw (InvalidFormatException){
+  settings_.fitness_weights = w;
 }
 shared_ptr<Config::PresolverResults> Config::getPresolverResults(){
   if(!pre_results)  
