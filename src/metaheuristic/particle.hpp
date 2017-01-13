@@ -66,7 +66,9 @@ public:
     int get_element_by_rank(int) const;
     int get_rank_by_id(int) const;
     int get_rank_by_element(int) const;
+    float get_relative_rank_by_element(int) const;
     void set_rank_by_element(int, int);
+    int random_unused_rank();
     Schedule& operator=(const Schedule& s)
     {
         rank = s.rank;
@@ -78,6 +80,10 @@ public:
     {
         rank.clear();
         elements.clear();
+    }
+    int size()
+    {
+        return elements.size();
     }
 private:
     vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
@@ -172,7 +178,7 @@ public:
         }
         cout << "unknown objective\n";    
     }
-    bool operator==(const Position& p_in)
+    bool operator==(const Position& p_in) const
     {
         if(multi_obj)
         {
@@ -187,6 +193,10 @@ public:
         {
             return (fitness_func() == p_in.fitness_func());
         }
+    }
+     bool operator!=(const Position& p_in) const
+    {
+        return !(*this == p_in);
     }
     Position& operator=(const Position& p)
     {
@@ -211,7 +221,7 @@ public:
     /**
      * Do I dominate p_in?
      */ 
-    bool dominate(Position& p_in)
+    bool dominate(Position& p_in) const
     {
         if(empty())
             return false;
@@ -399,13 +409,6 @@ private:
      * @return Vector of channels where \c destination is on \c dst_proc_id.
      */ 
     vector<int> get_channel_by_dst(Position&, int) const;    
-    /**
-     * Compares \c f with the individual memory #best_local_position.
-     * @return true if \c f is better than #best_local_position with 
-     * respect to #objective and false otherwise.
-     * @param f Fitness vector.
-     */ 
-    bool dominate(vector<int> f);
     /**
      * Moves \c v to a value between \c l and \c u.
      * @param v Value.

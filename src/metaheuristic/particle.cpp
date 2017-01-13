@@ -74,9 +74,8 @@ void Particle::repair_sched(Position& p)
                  */ 
                 if((a < (int) no_actors && b < (int) no_actors) && rank_a > rank_b && applications->dependsOn(a, b))
                 {
-                    p.proc_sched[proc].switch_ranks(i, j);
-                    LOG_DEBUG("switching " + tools::toString(a) +
-                              " and " + tools::toString(b));
+                    if(Schedule::random_bool())
+                        p.proc_sched[proc].switch_ranks(i, j);
                 }
             }
         }
@@ -118,9 +117,8 @@ void Particle::repair_send_sched(Position& p)
                        (rank_src_a < rank_src_b && rank_a > rank_b) 
                       )
                     {
-                        p.send_sched[proc].switch_ranks(i, j);
-                        LOG_DEBUG("switching send_next " + tools::toString(a) +
-                                  " and " + tools::toString(b));
+                        if(Schedule::random_bool())
+                            p.send_sched[proc].switch_ranks(i, j);                        
                     }
                 }
             }
@@ -156,9 +154,8 @@ void Particle::repair_rec_sched(Position& p)
                     
                         if(rank_src_a < rank_src_b && rank_a > rank_b)
                         {
-                            p.rec_sched[proc].switch_ranks(i, j);
-                            LOG_DEBUG("switching rec_next " + tools::toString(a) +
-                                      " and " + tools::toString(b));
+                            if(Schedule::random_bool())
+                                p.rec_sched[proc].switch_ranks(i, j);
                         }
                     }
                 }
@@ -357,7 +354,7 @@ vector<int> Particle::get_fitness()
 }
 void Particle::set_best_global(Position p)
 {
-    best_global_position = p;
+    best_global_position = p; 
 }
 Position Particle::get_current_position()
 {
@@ -380,13 +377,14 @@ void Particle::update_position()
         init_random();
         best_local_position = current_position;
         w_t = max_w_t;
+        cout << "the particle is randomly initiated again\n";
     }
     /// -# Update speed.    
     update_speed();    
     /// -# Move the particle based on the speed.
     move();
     /// -# Repair the particle.
-    repair(current_position);    
+    repair(current_position);       
 }
 float Particle::random_weight()
 {
@@ -430,8 +428,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[i];
         int bg_p = best_global_position.proc_mappings[i];
         speed.proc_sched[i] = w_t * speed.proc_sched[i] +
-                                 y1 * w_lb * (best_local_position.proc_sched[bl_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i)) +
-                                 y2 * w_gb * (best_global_position.proc_sched[bg_p].get_rank_by_element(i) - current_position.proc_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.proc_sched[bl_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.proc_sched[bg_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i));       
     }
     for(size_t i=0;i<speed.send_sched.size();i++)
     {
@@ -440,8 +438,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[src];
         int bg_p = best_global_position.proc_mappings[src];
         speed.send_sched[i] = w_t * speed.send_sched[i] +
-                                 y1 * w_lb * (best_local_position.send_sched[bl_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i)) +
-                                 y2 * w_gb * (best_global_position.send_sched[bg_p].get_rank_by_element(i) - current_position.send_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.send_sched[bl_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.send_sched[bg_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i));
     }
     for(size_t i=0;i<speed.rec_sched.size();i++)
     {
@@ -450,8 +448,8 @@ void Particle::update_speed()
         int bl_p = best_local_position.proc_mappings[dst];
         int bg_p = best_global_position.proc_mappings[dst];
         speed.rec_sched[i] = w_t * speed.rec_sched[i] +
-                                 y1 * w_lb * (best_local_position.rec_sched[bl_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i)) +
-                                 y2 * w_gb * (best_global_position.rec_sched[bg_p].get_rank_by_element(i) - current_position.rec_sched[cu_p].get_rank_by_element(i));
+                                 y1 * w_lb * (best_local_position.rec_sched[bl_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i)) +
+                                 y2 * w_gb * (best_global_position.rec_sched[bg_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i));
     }
 }
 void Particle::move() 
@@ -478,7 +476,7 @@ void Particle::move()
         {
             current_position.proc_sched[proc].set_rank_by_element(e, 
                     Schedule::random_round((float)current_position.proc_sched[proc].get_rank_by_element(e)+
-                                            speed.proc_sched[e]) );
+                                            speed.proc_sched[e] * current_position.proc_sched[proc].size()) );
         }
     }  
     /** \li Add send_sched. */  
@@ -488,7 +486,7 @@ void Particle::move()
         {
             current_position.send_sched[proc].set_rank_by_element(e, 
                     Schedule::random_round((float)current_position.send_sched[proc].get_rank_by_element(e)+
-                                            speed.send_sched[e]) );
+                                            speed.send_sched[e] * current_position.proc_sched[proc].size()) );
         }
     } 
     /** \li Add rec_sched. */        
@@ -498,58 +496,15 @@ void Particle::move()
         {
             current_position.rec_sched[proc].set_rank_by_element(e, 
                     Schedule::random_round((float)current_position.rec_sched[proc].get_rank_by_element(e)+
-                                            speed.rec_sched[e]) );
+                                            speed.rec_sched[e] * current_position.proc_sched[proc].size()) );
         }
     }              
     /** \li Decrease w_t.*/
-    if(w_t - delta_w_t > min_w_t)
+    if(w_t > min_w_t)
         w_t = w_t - delta_w_t;
     
 }
-bool Particle::dominate(vector<int> f)
-{
-    /**
-     * If best_local is empty
-     * Or
-     * it is an illegal position, i.e. throughput is negative and the new position is legal
-     * then return true 
-     */ 
-    if(best_local_position.fitness.empty() || (best_local_position.fitness[objective] < 0 && f[objective] > 0))
-        return true;
-    if(f[objective] < 0)
-        return false;
-    if(f[objective] < best_local_position.fitness[objective])
-        return true;
-    else
-        return false;    
-                
-    /*bool better_pr = true;
-    bool better_eng = true;
-    bool better_mem = true;
-    for(int i=0;i<mapping->getNumberOfApps();i++)
-    {
-        if(f[i] > best_local_position.fitness[i])
-        {
-            better_pr = false;
-            break;
-        }
-    }
-    //energy
-    if(f[f.size()-2] > best_local_position.fitness[best_local_position.fitness.size()-2])
-    {
-        better_eng = false;
-    }
-    //memory violations
-    if(f[f.size()-1] > best_local_position.fitness[best_local_position.fitness.size()-1])
-    {
-        better_mem = false;
-    }
-    if(better_pr && better_eng && better_mem)
-        return true;
-    else    
-        return false;
-    */ 
-}
+
 vector<int> Particle::bring_v_to_bound(vector<int> v, int l, int u)
 {
     vector<int> out;
@@ -559,10 +514,11 @@ vector<int> Particle::bring_v_to_bound(vector<int> v, int l, int u)
 }
 int Particle::bring_to_bound(int v, int l, int u)
 {
+    //float avg = (float)(u-l)/2.0;
     if(v < l)
-        return l;
+        return l;//floor(avg);
     if(v > u)
-        return u;
+        return u;//ceil(avg);
     return v;    
 }
 int Particle::get_objective()
@@ -571,7 +527,7 @@ int Particle::get_objective()
 }
 void Particle::avoid_stagnation()
 {
-    //w_t = max_w_t;
+    w_t = max_w_t/2;
     for(size_t i=0;i<speed.proc_mappings.size();i++)
         speed.proc_mappings[i] += 1 ? Schedule::random_bool() : -1;
     for(size_t i=0;i<speed.proc_modes.size();i++)
@@ -584,7 +540,7 @@ std::ostream& operator<< (std::ostream &out, const Speed &s)
         out << m << ", ";
     out << endl << "proc_modes:";    
     for(auto m : s.proc_modes)
-        out << m << ", ";   
+        out << m << ", ";  /* 
     out << endl << "tdmaAlloc:";    
     for(auto t : s.tdmaAlloc)
         out << t << ", ";
@@ -596,14 +552,16 @@ std::ostream& operator<< (std::ostream &out, const Speed &s)
         out << se << ", ";
     out << endl << "rec_sched:";        
     for(auto r : s.rec_sched)
-        out << r << ", ";        
+        out << r << ", ";    */    
     return out;
 }
 std::ostream& operator<< (std::ostream &out, const Particle &particle)
 {
     out << "current position: ====================\n" << particle.current_position << endl;
-    out << "best position: ====================\n" << particle.best_local_position << endl;
-    out << "speed: ====================\n" << particle.speed;
+    out << "best l position: ====================\n" << particle.best_local_position << endl;
+    out << "best g position: ====================\n" << particle.best_global_position << endl;
+    out << "speed: ====================\n" << particle.speed << endl;
+    out << "w_t:" << particle.w_t;
     return out;
 }
 std::ostream& operator<< (std::ostream &out, const Position &p)
@@ -613,7 +571,7 @@ std::ostream& operator<< (std::ostream &out, const Position &p)
         out << m << " ";
     out << endl << "proc_modes:";    
     for(auto m : p.proc_modes)
-        out << m << " ";   
+        out << m << " ";   /*
     out << endl << "tdmaAlloc:";    
     for(auto t : p.tdmaAlloc)
         out << t << " ";
@@ -625,7 +583,7 @@ std::ostream& operator<< (std::ostream &out, const Position &p)
         out << s;
     out << endl << "rec_sched -----";        
     for(auto r : p.rec_sched)
-        out << r << " ";    
+        out << r << " ";    */
     out << endl << "fitness -----\n";        
     for(auto f : p.fitness)
         out << f << " ";                
@@ -681,6 +639,17 @@ int Schedule::get_rank_by_element(int elem) const
     {
         if(elements[i] == elem)
             return rank[i];
+    }
+    THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
+           
+    return -1;
+}
+float Schedule::get_relative_rank_by_element(int elem) const
+{
+    for(size_t i=0;i<rank.size();i++)
+    {
+        if(elements[i] == elem)
+            return ((float)rank[i])/elements.size();
     }
     THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
            
@@ -783,35 +752,7 @@ void Schedule::repair_dist()
         int cnt = std::count(rank.begin(), rank.end(), rank[i] );
         if(cnt > 1)
         {
-            if(random_bool())
-            {
-                ///Find first unused rank
-                size_t j;
-                for(j=0;j<rank.size();j++)
-                {
-                    int cnt_j = std::count(rank.begin(), rank.end(), j);
-                    if(cnt_j == 0)
-                    {
-                        set_rank(i, j);
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                ///Find last unused rank
-                size_t j;
-                for(j=rank.size()-1;j>=0;j--)
-                {
-                    int cnt_j = std::count(rank.begin(), rank.end(), j);
-                    if(cnt_j == 0)
-                    {
-                        set_rank(i, j);
-                        break;
-                    }
-                }
-            }
-                        
+            set_rank(i, random_unused_rank());                        
         }
     }
 }
@@ -825,4 +766,23 @@ bool Schedule::random_bool()
   if(tmp == 0)
       return true;
   return false;  
+}
+int Schedule::random_unused_rank()
+{
+    vector<int> unused_ranks;
+    for(size_t j=0;j<rank.size();j++)
+    {
+        int cnt_j = std::count(rank.begin(), rank.end(), j);
+        if(cnt_j == 0)
+        {
+            unused_ranks.push_back(j);
+        }
+    }
+    
+    random_device rnd_device;
+    uniform_int_distribution<int> dist(0, unused_ranks.size()-1);
+    mt19937 mersenne_engine(rnd_device());  
+    auto gen = std::bind(dist, mersenne_engine);
+    auto i = gen();
+    return unused_ranks[i];    
 }
