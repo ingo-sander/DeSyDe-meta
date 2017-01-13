@@ -27,12 +27,18 @@ void Swarm::init()
                                 cfg.settings().w_individual, cfg.settings().w_social,
                                 cfg.settings().multi_obj, cfg.settings().fitness_weights));        
         particle_set.push_back(p);
+        LOG_INFO("Initializing the swarm");
     }    
 }
 void Swarm::search()
 {
     out.open(cfg.settings().output_path+"out/out_meta.txt");
-    
+    ofstream out_csv, out_tex;
+    out_csv.open(cfg.settings().output_path+"out/data.csv");
+    out_tex.open(cfg.settings().output_path+"out/plot.tex");
+    string sep="";         
+   for(size_t i=0;i<100;i++)
+       sep+="=";
     auto last_update = 0;
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
@@ -44,13 +50,19 @@ void Swarm::search()
     {
         LOG_INFO("Generation "+tools::toString(g)+" last_update "+
                   tools::toString(last_update) + " pareto size: "+
-                  tools::toString(par_f.pareto.size()));
-        if(par_f.empty())
+                  tools::toString(par_f.pareto.size()) +
+                  " memory size: "+
+                  tools::toString(memory.mem.size())
+                  );
+        if(par_f.empty() && memory.empty())
             init();
+        /*if(stagnation)    
+            stagnation = false;        
         if(g - last_update > no_generations/2)
             stagnation = true;
         else
             stagnation = false;        
+            */ 
         auto start_fitness = runTimer::now();
         for (int i = 0; i < no_threads; i++) 
         {
@@ -71,11 +83,20 @@ void Swarm::search()
         ///Find the best particle
         for(auto p: particle_set)
         {
-            if(par_f.update_pareto(p->get_current_position()))
-                last_update = g;
+            if(cfg.settings().multi_obj)
+            {
+                if(par_f.update_pareto(p->get_current_position()))
+                    last_update = g;
+            }
+            else
+            {
+                if(memory.update_memory(p->get_current_position()))
+                    last_update = g;
+            }
         }
         /*cout << "pareto front--------------------------\n"
              << par_f << endl;  */
+            
         auto start_update = runTimer::now();
         if(g+1- last_update < no_generations)        
         {
@@ -100,7 +121,10 @@ void Swarm::search()
     auto dur_update_s = std::chrono::duration_cast<std::chrono::milliseconds>(dur_update).count();
     auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(durAll).count();
     std::stringstream stat;
-    stat    << "===== search ended after: " << durAll_s << " s (" << durAll_ms 
+    stat    << "===== search ended after: " << durAll_s/3600 << " h " 
+            << (durAll_s%3600)/60 << " m "
+            << (durAll_s%60) << " s "
+            << "(" << durAll_ms 
             << " ms)\nfitness=" << dur_fitness_s << "ms update=" << dur_update_s << "ms \n"
             << "no threads=" << no_threads 
             << " last update in generation " << last_update
@@ -108,19 +132,27 @@ void Swarm::search()
             << endl;
    cout << stat.str() << endl;
    out << stat.str() << endl;         
-   string sep="";         
-   for(size_t i=0;i<100;i++)
-       sep+="=";
-   out << sep << endl; 
-   out << par_f << sep << endl;   
+   
+   out << sep << endl;
+   if(cfg.settings().multi_obj) 
+        out << par_f << sep << endl;   
+   else
+        out << memory << sep << endl;       
    for(auto p : par_f.pareto)
        out << p << endl << sep << endl;
    for(auto p : particle_set)
-        out << p->get_speed() << endl << sep << endl;
+        out << "position:\n" << *p << endl << sep << endl;
    out.close();
    
    vector<vector<int>> data;
    for(auto p : par_f.pareto)
+   {
+       vector<int> tmp;
+       tmp.push_back(p.fitness_func());
+       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
+       data.push_back(tmp);
+   }
+   for(auto p : memory.mem)
    {
        vector<int> tmp;
        tmp.push_back(p.fitness_func());
@@ -135,11 +167,11 @@ void Swarm::search()
    titles.push_back("energy");    
    titles.push_back("memory");
    Plot pl(titles, data);    
-   ofstream out_csv, out_tex;
-   out_csv.open(cfg.settings().output_path+"out/data.csv");
+
+   
    out_csv << pl.csv;
    out_csv.close();
-   out_tex.open(cfg.settings().output_path+"out/plot.tex");
+   
    out_tex << pl.tex;
    out_tex.close();
    
@@ -149,10 +181,10 @@ std::ostream& operator<< (std::ostream &out, const Swarm &swarm)
     out << "no particles=" << swarm.no_particles << endl;
     return out;
 }
-int Swarm::random_par()
+int Swarm::random_indx(int max)
 {
     random_device rnd_device;
-    uniform_int_distribution<int> dist(0, par_f.pareto.size()-1);
+    uniform_int_distribution<int> dist(0, max);
     mt19937 mersenne_engine(rnd_device());  
     auto gen = std::bind(dist, mersenne_engine);
     int i = gen();
@@ -253,10 +285,20 @@ void Swarm::update_position(int t_id)
         end_id = no_particles;
     for(int i=start_id;i<end_id;i++)    
     {
-        int par_indx = random_par();        
-        if(!par_f.pareto.empty())
+        if(cfg.settings().multi_obj && !par_f.pareto.empty())
         {
+            int par_indx = random_indx(par_f.pareto.size()-1);        
             particle_set[i]->set_best_global(par_f.pareto[par_indx]);
+            if(stagnation)
+            {
+                particle_set[i]->avoid_stagnation();                
+            }
+            particle_set[i]->update_position();
+        }
+        if(!cfg.settings().multi_obj && !memory.empty())
+        {
+            int mem_indx = random_indx(memory.mem.size()-1);        
+            particle_set[i]->set_best_global(memory.mem[mem_indx]);
             if(stagnation)
             {
                 particle_set[i]->avoid_stagnation();                
@@ -267,3 +309,60 @@ void Swarm::update_position(int t_id)
     
 }
 
+bool Memory::empty()
+{
+    return mem.empty();
+}
+bool Memory::update_memory(Position new_p)
+{
+    if(mem.size() < max_size && !new_p.invalid())
+    {
+        mem.push_back(new_p);
+        return true;
+    }
+    if(exists_in_mem(new_p))
+        return false;
+        
+    bool added = false;
+    for(auto p: mem)
+    {
+        if((new_p.dominate(p)))
+        {
+            mem.push_back(new_p);
+            added = true;
+            break;
+        }
+    }
+    if(added)
+       remove_worst();
+    return added;   
+}
+bool Memory::exists_in_mem(Position& new_p)
+{
+    for(auto p: mem)
+    {
+        if(new_p == p)
+            return true;
+    }
+    return false;
+}
+void Memory::remove_worst()
+{
+    int worst_i=0;
+    for(size_t i=1;i<mem.size();i++)
+    {
+        if(mem[worst_i].dominate(mem[i]))
+        {
+            worst_i = i;            
+        }
+    }
+    mem.erase(mem.begin()+worst_i);
+}
+std::ostream& operator<< (std::ostream &out, const Memory &m)
+{
+    for(auto po : m.mem)
+        out << tools::toString(po.fitness_func()) << " " 
+            << tools::toString(po.fitness) 
+            << endl;
+    return out;    
+}

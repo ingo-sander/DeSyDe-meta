@@ -37,7 +37,7 @@
 #include "particle.hpp"
 using namespace std;
 /**
- * \class ParetoFront
+ * \struct ParetoFront
  *
  * \brief Stores the pareto front of the \ref Swarm.
  *
@@ -70,6 +70,23 @@ struct ParetoFront
     friend std::ostream& operator<< (std::ostream &out, const ParetoFront &p);
 };
 /**
+ * \struct Memory
+ *
+ * \brief Stores the memory of the \ref Swarm.
+ *
+ */
+struct Memory
+{
+    Memory(){};
+    vector<Position> mem;
+    bool empty();
+    bool update_memory(Position);
+    void remove_worst();
+    bool exists_in_mem(Position&);
+    const size_t max_size=1;
+    friend std::ostream& operator<< (std::ostream &out, const Memory &m);
+};
+/**
  * \class Swarm
  *
  * \brief The swarm class in PSO.
@@ -92,12 +109,13 @@ private:
     const int no_threads;
     int particle_per_thread;
     ParetoFront par_f;
+    Memory memory;/** used in case of single objective.*/
     ofstream out;
     bool stagnation;
     const bool multi_obj = false;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    int random_par();/** returns index of a random pareto. */
+    int random_indx(int);/** returns index of a random index. */
     void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
     void update_position(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
