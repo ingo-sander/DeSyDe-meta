@@ -158,15 +158,15 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
               boost::bind(&Config::setNoParticles, this, _1)),
           "Number of particles per objective used in the search.")
       ("meta.w_individual",
-          po::value<float>()->default_value(2.5)->notifier(
+          po::value<float>()->default_value(2.05)->notifier(
               boost::bind(&Config::setWeightInd, this, _1)),
           "Weight of the individual component.")
       ("meta.w_social",
-          po::value<float>()->default_value(2.25)->notifier(
+          po::value<float>()->default_value(2.05)->notifier(
               boost::bind(&Config::setWeightSoc, this, _1)),
           "Weight of the social component.")
       ("meta.w_current",
-          po::value<float>()->default_value(1.5)->notifier(
+          po::value<float>()->default_value(0.9)->notifier(
               boost::bind(&Config::setWeightCur, this, _1)),
           "Weight of the current position.")
       ("meta.multi_obj",
