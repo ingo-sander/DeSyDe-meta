@@ -31,258 +31,9 @@
 #include <iostream>
 #include <functional>
 
-#include "../exceptions/runtimeexception.h"
-#include "../system/design.hpp"
+#include "position.hpp"
 using namespace std;
 
-/**
- * \class Schedule
- *
- * \brief Stores Schedules.
- * 
- * Each element is associated with a rank which is the order of that 
- * element in the order-based schedule.
- *
- */
-class Schedule{
-public:
-    /** Creates a random schedule out of input elements and dummy node. */
-    Schedule(vector<int>, int);
-    friend std::ostream& operator<< (std::ostream &out, const Schedule &sched);
-    void set_rank(int index, int value);
-    void set_rank(vector<int> _rank);
-    vector<int> get_rank();
-    vector<int> get_next();
-    /** Element-wise difference of rank and input vector. */
-    vector<int> rank_diff(vector<int>);
-    /** Addes the rank with the input (speed). */
-    void rank_add(vector<float>);
-    /** Randomly slecets ceil or floor. */
-    static int random_round(float);
-    static bool random_bool();
-    int get_next(int);
-    void switch_ranks(int, int);    
-    vector<int> get_elements();
-    int get_element_by_rank(int) const;
-    int get_rank_by_id(int) const;
-    int get_rank_by_element(int) const;
-    float get_relative_rank_by_element(int) const;
-    void set_rank_by_element(int, int);
-    int random_unused_rank();
-    Schedule& operator=(const Schedule& s)
-    {
-        rank = s.rank;
-        dummy = s.dummy;
-        elements= s.elements;
-        return *this;
-    }
-    ~Schedule()
-    {
-        rank.clear();
-        elements.clear();
-    }
-    int size()
-    {
-        return elements.size();
-    }
-private:
-    vector<int> elements;/** set of the elements (actor id or channel id) in this schedule.*/
-    int dummy;/** id of dummy actor or dummy channel. */
-    /** 
-     * stores the position of the items in the sequence. 
-     * rank[i] is the position of elements[i]
-     */
-    vector<int> rank;
-    /**
-     * Repairs the schedules which violate the distinct constraint.
-     */ 
-    void repair_dist();    
-};
-/**
- * \class Speed
- *
- * \brief Stores speed of the particles (\f$ V(t) \f$).
- *
- */
-struct Speed{
-    Speed(int no_actors, int no_channels, int no_processors)
-    {
-        proc_sched.resize(no_actors, 0);
-        send_sched.resize(no_channels, 0);
-        rec_sched.resize(no_channels, 0);
-        proc_mappings.resize(no_actors, 0);
-        proc_modes.resize(no_processors, 0);
-        tdmaAlloc.resize(no_processors, 0);
-    }
-    vector<float> proc_sched;
-    vector<float> send_sched;
-    vector<float> rec_sched;
-    vector<float> proc_mappings;
-    vector<float> proc_modes;
-    vector<float> tdmaAlloc;
-    friend std::ostream& operator<< (std::ostream &out, const Speed &s);
-};
-/**
- * \class Position
- *
- * \brief Stores the position of particles.
- */
-struct Position{
-public:
-    Position(bool _multi_obj, vector<float> _w):
-            multi_obj(_multi_obj),
-            weights(_w)
-            {
-            };
-   ~Position()
-    {
-        proc_sched.clear();
-        send_sched.clear();
-        rec_sched.clear();            
-    }
-    bool multi_obj;
-    vector<Schedule> proc_sched;
-    vector<Schedule> send_sched;
-    vector<Schedule> rec_sched;
-    vector<int> proc_mappings;
-    vector<int> proc_modes;        
-    vector<int> tdmaAlloc;     
-    vector<int> get_actors_by_proc(int) const;    
-    vector<int> fitness;
-    vector<float> weights;
-    friend std::ostream& operator<< (std::ostream &out, const Position &p);
-    
-    Position(const Position &obj) 
-    {
-        multi_obj = obj.multi_obj;
-        proc_mappings = obj.proc_mappings;
-        proc_modes = obj.proc_modes;
-        tdmaAlloc = obj.tdmaAlloc;
-        proc_sched = obj.proc_sched;
-        send_sched = obj.send_sched;
-        rec_sched = obj.rec_sched;
-        fitness = obj.fitness;   
-        weights = obj.weights;              
-    }
-    void print_multi_obj()
-    {
-        if(multi_obj)
-        {
-            cout << "multi objective\n";
-            return;
-        }
-        if(!multi_obj)
-        {
-            cout << "single objective\n";    
-            return;
-        }
-        cout << "unknown objective\n";    
-    }
-    bool operator==(const Position& p_in) const
-    {
-        if(multi_obj)
-        {
-            for(size_t i=0;i<fitness.size();i++)
-            {
-                if(fitness[i] != p_in.fitness[i])
-                    return false;
-            }
-            return true;
-        }
-        else
-        {
-            return (fitness_func() == p_in.fitness_func());
-        }
-    }
-     bool operator!=(const Position& p_in) const
-    {
-        return !(*this == p_in);
-    }
-    Position& operator=(const Position& p)
-    {
-        proc_mappings = p.proc_mappings;
-        proc_modes = p.proc_modes;
-        tdmaAlloc = p.tdmaAlloc;
-        fitness = p.fitness;
-        weights = p.weights;
-        multi_obj = p.multi_obj;
-        proc_sched.clear();
-        send_sched.clear();
-        rec_sched.clear();
-        for(auto s: p.proc_sched)
-            proc_sched.push_back(std::move(s));
-        for(auto s: p.send_sched)
-            send_sched.push_back(std::move(s));
-        for(auto s: p.rec_sched)
-            rec_sched.push_back(std::move(s));               
-        return *this;
-    }
-   
-    /**
-     * Do I dominate p_in?
-     */ 
-    bool dominate(Position& p_in) const
-    {
-        if(empty())
-            return false;
-        /** -# fitness can not be negative. */            
-        if(invalid())
-            return false;      
-            
-        if(p_in.empty() || p_in.invalid())
-            return true;
-                  
-        if(multi_obj)
-        {
-            for(size_t i=0;i<fitness.size();i++)
-            {
-                if(fitness[i] > p_in.fitness[i])
-                    return false;
-            }
-            return true;
-        }
-        else
-        {
-            if(fitness_func() < p_in.fitness_func())
-                return true;
-            else
-                return false;    
-        }
-    }
-    float fitness_func() const
-    {
-        float f;
-        for(size_t i=0;i<weights.size();i++)
-            f += (float) fitness[i] * weights[i];
-        
-        return f;
-    }
-    bool empty() const
-    {
-        return fitness.empty();
-    }
-    bool invalid() const
-    {
-        for(auto f : fitness)
-            if(f < 0)
-                return true;   
-       
-       return false;         
-    }
-    static int weighted_sum(int a, int b, float w) 
-    {
-        float diff = w*(b - a);
-        return Schedule::random_round((float) a + diff);
-    }
-    static int weighted_sum(int a, int b, int c, float w1, float w2) 
-    {
-        float diff1 = w1*(b - a);
-        float diff2 = w2*(c - a);
-        return Schedule::random_round((float) a + diff1 + diff2);
-    }
- 
-  
-};
 /**
  * \class Particle
  *
@@ -314,6 +65,7 @@ public:
      *        Weight of social memory.
      */ 
     Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool, vector<float>);
+    Particle(const Particle&);
     /** 
      * Returns the fitness value of the current position of the particle.
      * @return Vector of fitness values for all aobjectives.
@@ -340,7 +92,7 @@ public:
      * @return position
      *         \c Position object.
      */ 
-    Position get_current_position();
+    Position get_current_position() const;
     /** Updates the current position based on the local best and global best.*/
     void update_position();
     /**
@@ -361,6 +113,14 @@ public:
      * Overloads the << operator.
      */      
     friend std::ostream& operator<< (std::ostream &out, const Particle &particle);    
+    /**
+     * @return true if my current position dominates the input particle's current position.
+     */
+    bool dominate(const shared_ptr<Particle>) const;     
+    /**
+     * move the particle's current position to the opposite position.
+     */
+     void opposite(); 
 private:    
     shared_ptr<Mapping> mapping;/*!< Pointer to \c Mapping object.*/
     shared_ptr<Applications> applications;/*!< Pointer to \c Application object.*/
@@ -378,8 +138,8 @@ private:
     float w_lb;/*!< Weight of local best. \f$ c_1 \f$ in \ref update_speed. */
     float w_gb;/*!< Weight of global best.\f$ c_2 \f$ in \ref update_speed. */
     int no_invalid_moves;/*!< Number of moves in which the schedule resulted in deadlock (negative fitness).*/
-    const int thr_invalid_mov = 30;/*!< Threshold for the number of invalid moves.*/
-    const float delta_w_t = 0.05; /*!< Delta for decreasing \c w_t.*/
+    const int thr_invalid_mov = 25;/*!< Threshold for the number of invalid moves.*/
+    const float delta_w_t = 0.01; /*!< Delta for decreasing \c w_t.*/
     const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
     const float max_w_t;/*!< Maximum \c w_t.*/ 
     const bool multi_obj;/*!< True if we are solving a multiobjective optimization problem.*/

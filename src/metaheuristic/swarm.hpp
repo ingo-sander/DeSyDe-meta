@@ -83,6 +83,7 @@ struct Memory
     bool update_memory(Position);
     void remove_worst();
     bool exists_in_mem(Position&);
+    std::chrono::duration<double>  ins_time;
     const size_t max_size=1;
     friend std::ostream& operator<< (std::ostream &out, const Memory &m);
 };
@@ -103,14 +104,17 @@ private:
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
     vector<shared_ptr<Particle>> particle_set;
+    vector<shared_ptr<Particle>> opposition_set;
     const size_t no_objectives; /**< total number of objectives. */
     const size_t no_particles; /**< total number of particles. */
     const size_t no_generations; /**< total number of particles. */
     const int no_threads;
     int particle_per_thread;
     ParetoFront par_f;
-    Memory memory;/** used in case of single objective.*/
-    ofstream out;
+    Memory long_term_memory;/** used in case of single objective.*/
+    Memory short_term_memory;/** used in case of single objective.*/
+    vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
+    ofstream out, out_csv, out_tex;;
     bool stagnation;
     const bool multi_obj = false;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
@@ -119,5 +123,12 @@ private:
     void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
     void update_position(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
+    void evaluate_oppositions();/*! Evaluates the opposition particles and adds the good ones to the particle set.*/
+    void merge_main_opposite();/*! Merges the opposition set with the main particle set.*/
+    void print();
+    float average_speed();
+    int no_converged_particles();
+    void replace_converged_particles();
+    int no_reinits;
 };
 

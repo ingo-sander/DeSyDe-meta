@@ -27,8 +27,29 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
         THROW_EXCEPTION(RuntimeException, tools::toString(no_entities + 2) +
                         " fitness_weights needed while " + tools::toString(fitness_weights.size()) +
                         " provided");
-    init_random();    
+    init_random();
 }
+Particle::Particle(const Particle& _p):
+                    mapping(_p.mapping),
+                    applications(_p.applications),
+                    no_entities(mapping->getNumberOfApps()),
+                    no_actors(applications->n_SDFActors()),
+                    no_channels(applications->n_SDFchannels()),
+                    no_processors(mapping->getPlatform()->nodes()),
+                    no_tdma_slots(mapping->getPlatform()->tdmaSlots()),
+                    objective(_p.objective),
+                    current_position(_p.current_position),
+                    best_local_position(_p.best_local_position),
+                    best_global_position(_p.best_global_position),
+                    speed(_p.speed),                    
+                    w_t(_p.w_t),
+                    w_lb(_p.w_lb),
+                    w_gb(_p.w_gb),
+                    no_invalid_moves(0),
+                    max_w_t(_p.max_w_t),
+                    multi_obj(_p.multi_obj),
+                    fitness_weights(_p.fitness_weights)
+{}
 void Particle::build_schedules(Position& p)
 {
     p.proc_sched.clear();
@@ -45,11 +66,11 @@ void Particle::build_schedules(Position& p)
 }
 void Particle::repair(Position &p)
 {
-    p.proc_mappings = bring_v_to_bound(p.proc_mappings, 0, no_processors-1);
+    p.proc_mappings = Speed::bring_v_to_bound(p.proc_mappings, 0, (int)no_processors-1);
      for(size_t i=0;i<no_processors;i++)
     {
        int no_proc_modes = mapping->getPlatform()->getModes(i);
-       p.proc_modes[i] = bring_to_bound(p.proc_modes[i], 0, no_proc_modes-1);
+       p.proc_modes[i] = Speed::bring_to_bound(p.proc_modes[i], 0, no_proc_modes-1);
     }
     repair_tdma(p);    
     repair_sched(p);
@@ -60,7 +81,7 @@ void Particle::repair_sched(Position& p)
 {
     for(size_t proc=0;proc<p.proc_sched.size();proc++)
     {
-        p.proc_sched[proc].set_rank( bring_v_to_bound(p.proc_sched[proc].get_rank(), 0, p.proc_sched[proc].get_rank().size()-1) );        
+        p.proc_sched[proc].set_rank( Speed::bring_v_to_bound(p.proc_sched[proc].get_rank(), 0, (int)p.proc_sched[proc].get_rank().size()-1) );        
         for(size_t i=0;i<p.proc_sched[proc].get_elements().size();i++)
         {
             int a = p.proc_sched[proc].get_elements()[i];
@@ -86,7 +107,7 @@ void Particle::repair_send_sched(Position& p)
 {
     for(size_t proc=0;proc<p.send_sched.size();proc++)
     {
-        p.send_sched[proc].set_rank( bring_v_to_bound(p.send_sched[proc].get_rank(), 0, p.send_sched[proc].get_rank().size()-1) );
+        p.send_sched[proc].set_rank( Speed::bring_v_to_bound(p.send_sched[proc].get_rank(), 0, (int)p.send_sched[proc].get_rank().size()-1) );
         for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
         {
             int a = p.send_sched[proc].get_elements()[i];
@@ -134,7 +155,7 @@ void Particle::repair_rec_sched(Position& p)
      */ 
     for(size_t proc=0;proc<p.rec_sched.size();proc++)
     {
-        p.rec_sched[proc].set_rank( bring_v_to_bound(p.rec_sched[proc].get_rank(), 0, p.rec_sched[proc].get_rank().size()-1) );
+        p.rec_sched[proc].set_rank( Speed::bring_v_to_bound(p.rec_sched[proc].get_rank(), 0, (int)p.rec_sched[proc].get_rank().size()-1) );
         for(size_t i=0;i<p.rec_sched[proc].get_elements().size();i++)
         {
             int a = p.rec_sched[proc].get_elements()[i];
@@ -238,7 +259,7 @@ void Particle::init_random()
 }
 void Particle::repair_tdma(Position& p)
 {
-    p.tdmaAlloc = bring_v_to_bound(p.tdmaAlloc, 0, no_tdma_slots);
+    p.tdmaAlloc = Speed::bring_v_to_bound(p.tdmaAlloc, 0, (int)no_tdma_slots);
     vector<int> no_inout_channels(no_processors, 0);
     ///Random # tdma slots based on src and dst of channels
     for(size_t i=0;i<no_channels;i++)
@@ -336,11 +357,11 @@ void Particle::calc_fitness()
         cout << *this << endl;
         THROW_EXCEPTION(RuntimeException, e.what() );
     }
-    if(current_position.dominate(best_local_position) || best_local_position.empty())
+    if(current_position.dominate(best_local_position) || best_local_position.empty() || best_local_position == current_position)
     {   
         best_local_position = current_position;
     }
-    if(current_position.fitness[0] < 0)
+    if(current_position.fitness[0] <= 0)
     {
         no_invalid_moves++;
     }
@@ -356,7 +377,7 @@ void Particle::set_best_global(Position p)
 {
     best_global_position = p; 
 }
-Position Particle::get_current_position()
+Position Particle::get_current_position() const
 {
     return current_position;
 }
@@ -376,6 +397,7 @@ void Particle::update_position()
     {
         init_random();
         best_local_position = current_position;
+        best_global_position = current_position;
         w_t = max_w_t;
         cout << "the particle is randomly initiated again\n";
     }
@@ -451,6 +473,8 @@ void Particle::update_speed()
                                  y1 * w_lb * (best_local_position.rec_sched[bl_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.rec_sched[bg_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i));
     }
+    ///#- applying the speed bounds
+    speed.apply_bounds();
 }
 void Particle::move() 
 {
@@ -458,7 +482,7 @@ void Particle::move()
     {
         current_position.proc_mappings[i] = Schedule::random_round((float) current_position.proc_mappings[i] + speed.proc_mappings[i]);                 
     }
-    current_position.proc_mappings = bring_v_to_bound(current_position.proc_mappings, 0, no_processors-1);
+    current_position.proc_mappings = Speed::bring_v_to_bound(current_position.proc_mappings, 0, (int)no_processors-1);
     for(size_t i=0;i<current_position.proc_modes.size();i++)
     {
         current_position.proc_modes[i] = Schedule::random_round((float) current_position.proc_modes[i] + speed.proc_modes[i]);                 
@@ -505,33 +529,16 @@ void Particle::move()
     
 }
 
-vector<int> Particle::bring_v_to_bound(vector<int> v, int l, int u)
-{
-    vector<int> out;
-    for(auto i: v)
-        out.push_back(bring_to_bound(i, l, u));
-    return out;    
-}
-int Particle::bring_to_bound(int v, int l, int u)
-{
-    //float avg = (float)(u-l)/2.0;
-    if(v < l)
-        return l;//floor(avg);
-    if(v > u)
-        return u;//ceil(avg);
-    return v;    
-}
 int Particle::get_objective()
 {
     return objective;
 }
 void Particle::avoid_stagnation()
 {
-    w_t = max_w_t/2;
-    for(size_t i=0;i<speed.proc_mappings.size();i++)
-        speed.proc_mappings[i] += 1 ? Schedule::random_bool() : -1;
-    for(size_t i=0;i<speed.proc_modes.size();i++)
-        speed.proc_modes[i] += 1 ? Schedule::random_bool() : -1;    
+    current_position.opposite();
+    build_schedules(current_position);
+    repair(current_position);       
+    cout << "moving to opposite\n";    
 }
 std::ostream& operator<< (std::ostream &out, const Speed &s)
 {
@@ -564,31 +571,7 @@ std::ostream& operator<< (std::ostream &out, const Particle &particle)
     out << "w_t:" << particle.w_t;
     return out;
 }
-std::ostream& operator<< (std::ostream &out, const Position &p)
-{
-    out << "proc_mappings: ";
-    for(auto m : p.proc_mappings)
-        out << m << " ";
-    out << endl << "proc_modes:";    
-    for(auto m : p.proc_modes)
-        out << m << " ";   /*
-    out << endl << "tdmaAlloc:";    
-    for(auto t : p.tdmaAlloc)
-        out << t << " ";
-    out << endl << "proc_sched -----";    
-    for(auto s : p.proc_sched)
-        out << s;
-    out << endl << "send_sched -----";        
-    for(auto s : p.send_sched)
-        out << s;
-    out << endl << "rec_sched -----";        
-    for(auto r : p.rec_sched)
-        out << r << " ";    */
-    out << endl << "fitness -----\n";        
-    for(auto f : p.fitness)
-        out << f << " ";                
-    return out;
-}
+
 std::ostream& operator<< (std::ostream &out, const Schedule &sched)
 {
     out << endl << "elements:";    
@@ -600,189 +583,19 @@ std::ostream& operator<< (std::ostream &out, const Schedule &sched)
         out << r << " ";        
     return out;
 }
-Schedule::Schedule(vector<int> _elems, int _dummy):
-                   elements(_elems),
-                   dummy(_dummy)
+bool Particle::dominate(const shared_ptr<Particle> in_p)const
 {
-    for(size_t i=0;i<elements.size();i++)
-    {
-        rank.push_back(i);
-    }
-    std::random_device rd;
-    std::mt19937 g(rd());
- 
-    std::shuffle(rank.begin(), rank.end(), g);
+    Position new_pos = in_p->get_current_position();
+    return current_position.dominate(new_pos);
 }
-void Schedule::set_rank(int index, int value)
+void Particle::opposite()
 {
-    rank[index] = value;
-}
-void Schedule::set_rank(vector<int> _rank)
-{
-    if(rank.size() != _rank.size())
-        THROW_EXCEPTION(RuntimeException, "rank.size() != _rank.size()" );
-        
-    for(size_t i=0;i<_rank.size();i++)
-        set_rank(i, _rank[i]);
-    repair_dist();    
-}
-int Schedule::get_rank_by_id(int elem_id) const
-{
-    if((size_t) elem_id >= elements.size())
-        THROW_EXCEPTION(RuntimeException, "element is not in the set");
-           
-    return rank[elem_id];
-}
-int Schedule::get_rank_by_element(int elem) const
-{
-    for(size_t i=0;i<rank.size();i++)
-    {
-        if(elements[i] == elem)
-            return rank[i];
-    }
-    THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
-           
-    return -1;
-}
-float Schedule::get_relative_rank_by_element(int elem) const
-{
-    for(size_t i=0;i<rank.size();i++)
-    {
-        if(elements[i] == elem)
-            return ((float)rank[i])/elements.size();
-    }
-    THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
-           
-    return -1;
-}
-void Schedule::set_rank_by_element(int elem, int _rank) 
-{
-    for(size_t i=0;i<rank.size();i++)
-    {
-        if(elements[i] == elem)
-        {
-            rank[i] = _rank;
-            return;
-        }
-    }
-    THROW_EXCEPTION(RuntimeException, "set_rank_by_element: element " + tools::toString(elem) + " is not in the set");
-}
-vector<int> Schedule::get_rank()
-{
-    return rank;
-}
-vector<int> Schedule::get_elements()
-{
-    return elements;
-}
-
-int Schedule::get_next(int elem)
-{
-    int elem_id = -1;
-    ///First find the id of element
-    for(size_t i=0;i<elements.size();i++)
-    {
-        if(elements[i] == elem)
-            elem_id = i;
-    }
-    /**
-     * If the input is in the elements list, then we return the element with rank[elem_id]+1
-     */ 
-    if(elem_id < 0)
-        THROW_EXCEPTION(RuntimeException, "element is not in the set");
-    
-    return get_element_by_rank(rank[elem_id] + 1) ;
-    
-}
-vector<int> Schedule::get_next()
-{
-    vector<int> next;
-    for(auto e: elements)
-        next.push_back(get_next(e));        
-    return next;    
-}
-int Schedule::get_element_by_rank(int _rank) const
-{
-    /**
-     * If _rank is the largest rank, then we return the dummy ellement.
-     * othersiwe we find the element with the given rank.
-     */ 
-    if(_rank == (int) rank.size())
-        return dummy;
-    for(size_t i=0;i<rank.size();i++)
-    {
-        if(rank[i] == _rank)
-            return elements[i];        
-    }
-    THROW_EXCEPTION(RuntimeException, "could not find the element with input rank="+tools::toString(_rank));
-    return -1;
-}
-vector<int> Schedule::rank_diff(vector<int> _rank)
-{
-    if(rank.size() != _rank.size())
-        THROW_EXCEPTION(RuntimeException, "rank.size() != _rank.size()" );
-    vector<int> diff;
-    for(size_t i;i<rank.size();i++)
-        diff.push_back(rank[i] - _rank[i]);
-    
-    return diff;    
-}
-void Schedule::rank_add(vector<float> _speed)
-{
-    for(size_t i;i<rank.size();i++)
-        set_rank(i, rank[i] + random_round(_speed[i]));
-}
-int Schedule::random_round(float f)
-{
-  if(random_bool())
-    return ceil(f);
-  else    
-    return floor(f);  
-}
-void Schedule::switch_ranks(int i, int j)
-{
-    int tmp = rank[i];
-    set_rank(i, rank[j]);
-    set_rank(j, tmp);
-}
-void Schedule::repair_dist()
-{
-    for(size_t i=0;i<rank.size();i++)
-    {
-        int cnt = std::count(rank.begin(), rank.end(), rank[i] );
-        if(cnt > 1)
-        {
-            set_rank(i, random_unused_rank());                        
-        }
-    }
-}
-bool Schedule::random_bool()
-{
-  random_device rnd_device;
-  uniform_int_distribution<int> dist(0, 1);
-  mt19937 mersenne_engine(rnd_device());  
-  auto gen = std::bind(dist, mersenne_engine);
-  auto tmp = gen();
-  if(tmp == 0)
-      return true;
-  return false;  
-}
-int Schedule::random_unused_rank()
-{
-    vector<int> unused_ranks;
-    for(size_t j=0;j<rank.size();j++)
-    {
-        int cnt_j = std::count(rank.begin(), rank.end(), j);
-        if(cnt_j == 0)
-        {
-            unused_ranks.push_back(j);
-        }
-    }
-    
-    random_device rnd_device;
-    uniform_int_distribution<int> dist(0, unused_ranks.size()-1);
-    mt19937 mersenne_engine(rnd_device());  
-    auto gen = std::bind(dist, mersenne_engine);
-    auto i = gen();
-    return unused_ranks[i];    
+    current_position.opposite();
+    build_schedules(current_position);
+    repair(current_position);   
+    calc_fitness();    
+    //w_t = max_w_t;
+    best_local_position = current_position;
+    best_global_position = current_position;
+    speed = Speed(no_actors, no_channels, no_processors);    
 }

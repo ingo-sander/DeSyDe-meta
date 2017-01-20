@@ -12,6 +12,7 @@ Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application
                     stagnation(false)
 {   
     particle_per_thread = no_particles / no_threads;
+    no_reinits = 0;
 }
 Swarm::~Swarm()
 {
@@ -19,7 +20,9 @@ Swarm::~Swarm()
 }
 void Swarm::init()
 {
+    no_reinits++;
     particle_set.clear();
+    opposition_set.clear();
     for(size_t i=0;i<no_particles;i++)
     {
         shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
@@ -27,13 +30,20 @@ void Swarm::init()
                                 cfg.settings().w_individual, cfg.settings().w_social,
                                 cfg.settings().multi_obj, cfg.settings().fitness_weights));        
         particle_set.push_back(p);
-        LOG_INFO("Initializing the swarm");
-    }    
+        opposition_set.push_back(p);
+        
+        //insert the opposite as well
+        /*shared_ptr<Particle> tmp_p(new Particle(*p));        
+        tmp_p->opposite();
+        particle_set.push_back(tmp_p);        */
+        
+    }   
+    LOG_INFO("Initializing the swarm"); 
+    //THROW_EXCEPTION(RuntimeException, "intit finished" );
 }
 void Swarm::search()
 {
     out.open(cfg.settings().output_path+"out/out_meta.txt");
-    ofstream out_csv, out_tex;
     out_csv.open(cfg.settings().output_path+"out/data.csv");
     out_tex.open(cfg.settings().output_path+"out/plot.tex");
     string sep="";         
@@ -47,22 +57,33 @@ void Swarm::search()
     //for(size_t g=0;g<no_generations;g++)
     size_t g = 0;
     while(g - last_update < no_generations)
+    //while(average_speed() != 0)
     {
         LOG_INFO("Generation "+tools::toString(g)+" last_update "+
                   tools::toString(last_update) + " pareto size: "+
                   tools::toString(par_f.pareto.size()) +
                   " memory size: "+
-                  tools::toString(memory.mem.size())
+                  tools::toString(long_term_memory.mem.size()) +
+                  " no converged:" +
+                  tools::toString(no_converged_particles()) +
+                  " out of:" +
+                  tools::toString(no_particles) +
+                  " no re-inits:" +
+                  tools::toString(no_reinits)
                   );
-        if(par_f.empty() && memory.empty())
+         cout << "short_term_memory:" << short_term_memory << endl
+              << "long_term_memory:" << long_term_memory << endl;              
+        if(no_converged_particles() > (int)no_particles/4)
+        {
             init();
-        /*if(stagnation)    
-            stagnation = false;        
-        if(g - last_update > no_generations/2)
-            stagnation = true;
-        else
-            stagnation = false;        
-            */ 
+            //replace_converged_particles();
+            short_term_memory.mem.clear();
+        }
+        if(par_f.empty() && long_term_memory.empty())
+            init();
+        
+        
+             
         auto start_fitness = runTimer::now();
         for (int i = 0; i < no_threads; i++) 
         {
@@ -81,17 +102,23 @@ void Swarm::search()
 
         LOG_DEBUG("finding the best particle ");
         ///Find the best particle
-        for(auto p: particle_set)
+        for(size_t p=0;p<particle_set.size();p++)
         {
             if(cfg.settings().multi_obj)
             {
-                if(par_f.update_pareto(p->get_current_position()))
+                short_term_memory.update_memory(particle_set[p]->get_current_position());
+                if(par_f.update_pareto(particle_set[p]->get_current_position()))
                     last_update = g;
             }
             else
             {
-                if(memory.update_memory(p->get_current_position()))
+                short_term_memory.update_memory(particle_set[p]->get_current_position());
+                if(long_term_memory.update_memory(particle_set[p]->get_current_position()))
+                {
                     last_update = g;
+                    long_term_memory.ins_time = runTimer::now() - t_start;
+                    memory_hist.push_back(long_term_memory);
+                }
             }
         }
         /*cout << "pareto front--------------------------\n"
@@ -112,8 +139,10 @@ void Swarm::search()
                  t[i].join();
             }
         }   
+        //merge_main_opposite();
         dur_update += runTimer::now() - start_update;     
         g++;
+        
     }
     auto durAll = runTimer::now() - t_start;
     auto durAll_s = std::chrono::duration_cast<std::chrono::seconds>(durAll).count();
@@ -135,44 +164,22 @@ void Swarm::search()
    
    out << sep << endl;
    if(cfg.settings().multi_obj) 
-        out << par_f << sep << endl;   
+   {
+            out << par_f << sep << endl;               
+   }
    else
-        out << memory << sep << endl;       
+   {
+        out << long_term_memory << sep << endl;       
+        cout << long_term_memory << sep << endl;       
+   }
    for(auto p : par_f.pareto)
        out << p << endl << sep << endl;
    for(auto p : particle_set)
         out << "position:\n" << *p << endl << sep << endl;
    out.close();
    
-   vector<vector<int>> data;
-   for(auto p : par_f.pareto)
-   {
-       vector<int> tmp;
-       tmp.push_back(p.fitness_func());
-       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
-       data.push_back(tmp);
-   }
-   for(auto p : memory.mem)
-   {
-       vector<int> tmp;
-       tmp.push_back(p.fitness_func());
-       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
-       data.push_back(tmp);
-   }
-   std::sort (data.begin(), data.end()); 
-   vector<string> titles;
-   titles.push_back("fitness");    
-   for(int i=0;i<mapping->getNumberOfApps();i++)
-       titles.push_back("app"+tools::toString(i)+"-period");
-   titles.push_back("energy");    
-   titles.push_back("memory");
-   Plot pl(titles, data);    
-
-   
-   out_csv << pl.csv;
+   print();
    out_csv.close();
-   
-   out_tex << pl.tex;
    out_tex.close();
    
 }
@@ -291,20 +298,25 @@ void Swarm::update_position(int t_id)
             particle_set[i]->set_best_global(par_f.pareto[par_indx]);
             if(stagnation)
             {
-                particle_set[i]->avoid_stagnation();                
+                particle_set[i]->avoid_stagnation();                  
             }
             particle_set[i]->update_position();
         }
-        if(!cfg.settings().multi_obj && !memory.empty())
+        if(!cfg.settings().multi_obj && !short_term_memory.empty())
         {
-            int mem_indx = random_indx(memory.mem.size()-1);        
-            particle_set[i]->set_best_global(memory.mem[mem_indx]);
+            int mem_indx = random_indx(short_term_memory.mem.size()-1);        
+            particle_set[i]->set_best_global(short_term_memory.mem[mem_indx]);
             if(stagnation)
             {
-                particle_set[i]->avoid_stagnation();                
+                particle_set[i]->avoid_stagnation();                         
             }
             particle_set[i]->update_position();
         }
+        /*
+        /// copy the particle
+        shared_ptr<Particle> tmp_p(new Particle(*particle_set[i]));        
+        tmp_p->opposite();
+        opposition_set[i] = tmp_p;*/
     }
     
 }
@@ -363,6 +375,104 @@ std::ostream& operator<< (std::ostream &out, const Memory &m)
     for(auto po : m.mem)
         out << tools::toString(po.fitness_func()) << " " 
             << tools::toString(po.fitness) 
+            << " updated at:" << std::chrono::duration_cast<std::chrono::seconds>(m.ins_time).count() << "s"
             << endl;
+            
     return out;    
+}
+void Swarm::evaluate_oppositions()
+{
+    vector<shared_ptr<Particle>> opposition_set;
+    for(auto p :particle_set)
+    {
+        /// copy the particle
+        shared_ptr<Particle> tmp_p(new Particle(*p));        
+        tmp_p->opposite();
+        opposition_set.push_back(tmp_p);
+    }
+    /*
+    for(auto p: particle_set)
+        cout << p->get_current_position().fitness_func() << endl;
+    cout << "size=" << particle_set.size() << endl;    
+    THROW_EXCEPTION(RuntimeException, "sort completed");    */
+}
+void Swarm::merge_main_opposite()
+{
+    particle_set.insert(particle_set.end(), opposition_set.begin(), opposition_set.end());
+    std::sort(particle_set.begin(), particle_set.end(),
+                    [](shared_ptr<Particle> const a, shared_ptr<Particle> const b) -> bool 
+                    { return a->dominate(b); } );
+    particle_set.erase (particle_set.begin()+no_particles,particle_set.end());   
+}
+void Swarm::print()
+{
+   vector<vector<int>> data;
+   
+   for(auto p : par_f.pareto)
+   {
+       vector<int> tmp;
+       tmp.push_back(p.fitness_func());
+       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());       
+       data.push_back(tmp);
+   }
+   for(auto m : memory_hist)
+       for(auto p : m.mem)
+       {
+           vector<int> tmp;
+           tmp.push_back(p.fitness_func());
+           tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
+           auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.ins_time).count();
+           tmp.push_back(durAll_ms);
+           data.push_back(tmp);
+       }
+
+   std::sort (data.begin(), data.end()); 
+   vector<string> titles;
+   titles.push_back("fitness");    
+   for(int i=0;i<mapping->getNumberOfApps();i++)
+       titles.push_back("app"+tools::toString(i)+"-period");
+   titles.push_back("energy");    
+   titles.push_back("memory");
+   titles.push_back("time");
+   Plot pl(titles, data);       
+   out_csv << pl.csv;
+   out_tex << pl.tex;
+}
+float Swarm::average_speed()
+{
+    vector<float> p_speeds;
+    for(auto p : particle_set)
+        p_speeds.push_back(p->get_speed().average());
+    if(p_speeds.empty())
+        return 1; 
+    return Speed::average<float>(p_speeds);    
+}
+int Swarm::no_converged_particles()
+{
+    int cnt = 0;
+    for(auto p : particle_set)
+    {
+        if(p->get_speed().average() == 0)
+        {
+            cnt++;
+        }
+    }
+    return cnt;
+}
+void Swarm::replace_converged_particles()
+{
+    /// copy the particle
+    cout << "replace_converged_particles\n";
+    for(auto p : particle_set)
+    {
+        if(p->get_speed().average() == 0 || p->get_current_position().fitness_func() == short_term_memory.mem[0].fitness_func())
+        {    
+            shared_ptr<Particle> tmp_p(new Particle(*p));        
+            tmp_p->opposite();
+            /*cout << "p:" << *p << endl;
+            p = tmp_p;
+            cout << "new_p:" << *p << endl;
+            THROW_EXCEPTION(RuntimeException, "replaced" );*/
+        }
+    }
 }
