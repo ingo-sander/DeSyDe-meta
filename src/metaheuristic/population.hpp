@@ -34,32 +34,80 @@
 #include <chrono>
 
 #include "../exceptions/runtimeexception.h"
-#include "particle.hpp"
-#include "population.hpp"
+#include "individual.hpp"
 using namespace std;
 /**
- * \class Swarm
+ * \struct ParetoFront
  *
- * \brief The swarm class in PSO.
+ * \brief Stores the pareto front of the \ref Swarm.
  *
  */
-class Swarm{
+struct ParetoFront
+{
+    ParetoFront();
+    vector<Position> pareto;
+    /**
+     * Does pareto[indx] dominate p?
+     */ 
+    bool dominate(Position&, int);
+    /**
+     * Does pareto dominate p?
+     */ 
+    bool dominate(Position& p);
+    /**
+     * Compares the input position with the current front 
+     * and replaces if it dominates
+     */ 
+     /**
+     * Does p1 dominate p2?
+     */ 
+    bool dominate(Position& p1, Position& p2);
+    bool update_pareto(Position);
+    /**
+     * @return True if the pareto front is empty.
+     */ 
+    bool empty();
+    friend std::ostream& operator<< (std::ostream &out, const ParetoFront &p);
+};
+/**
+ * \struct Memory
+ *
+ * \brief Stores the memory of the \ref Swarm.
+ *
+ */
+struct Memory
+{
+    Memory(){};
+    vector<Position> mem;
+    bool empty();
+    bool update_memory(Position);
+    void remove_worst();
+    bool exists_in_mem(Position&);
+    std::chrono::duration<double>  ins_time;
+    const size_t max_size=1;
+    friend std::ostream& operator<< (std::ostream &out, const Memory &m);
+};
+/**
+ * \class Population
+ *
+ * \brief The population class for population-based metaheuristics.
+ *
+ */
+class Population{
 public: 
-    Swarm(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
-    ~Swarm();
+    Population(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
+    ~Population();
     void search();
-    friend std::ostream& operator<< (std::ostream &out, const Swarm &swarm);
-private:    
+protected:    
     Config& cfg;
     shared_ptr<Mapping> mapping;
     shared_ptr<Applications> applications;
-    vector<shared_ptr<Particle>> particle_set;
-    vector<shared_ptr<Particle>> opposition_set;
+    vector<shared_ptr<Individual>> population;
     const size_t no_objectives; /**< total number of objectives. */
-    const size_t no_particles; /**< total number of particles. */
-    const size_t no_generations; /**< total number of particles. */
+    const size_t no_individulas; /**< total number of particles. */
+    const size_t no_generations; /**< total number of generations. */
     const int no_threads;
-    int particle_per_thread;
+    int individual_per_thread;
     ParetoFront par_f;
     Memory long_term_memory;/** used in case of single objective.*/
     Memory short_term_memory;/** used in case of single objective.*/
@@ -69,16 +117,16 @@ private:
     const bool multi_obj = false;
     typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
     runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    int random_indx(int);/** returns index of a random index. */
-    void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
-    void update_position(int);/** updates the best position of particles in a thread. */ 
-    void init();/*!< Initializes the particles. */    
-    void evaluate_oppositions();/*! Evaluates the opposition particles and adds the good ones to the particle set.*/
-    void merge_main_opposite();/*! Merges the opposition set with the main particle set.*/
+    
+    void calc_fitness(int);/** calculates the fitness for individuals in a thread. */ 
+    virtual void update(int){};/** updates the population in a thread. */ 
+    virtual void init(){};/*!< Initializes the particles. */    
     void print();
-    float average_speed();
-    int no_converged_particles();
-    void replace_converged_particles();
     int no_reinits;
+    virtual bool termination(){return false;};
+    virtual bool is_converged(){return false;};
+    virtual void print_results(){};
+    bool is_timedout();
+    int random_indx(int max);
 };
 

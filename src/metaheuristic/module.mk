@@ -28,7 +28,7 @@
 # MODULE PATH AND FILES
 #=======================
 
-CPP_FILES := particle.cpp swarm.cpp plot.cpp position.cpp
+CPP_FILES := particle.cpp swarm.cpp plot.cpp position.cpp individual.cpp population.cpp
 
 
 

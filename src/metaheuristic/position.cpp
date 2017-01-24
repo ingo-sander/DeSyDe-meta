@@ -352,6 +352,17 @@ int Schedule::random_unused_rank()
     auto i = gen();
     return unused_ranks[i];    
 }
+std::ostream& operator<< (std::ostream &out, const Schedule &sched)
+{
+    out << endl << "elements:";    
+    for(auto e : sched.elements)
+        out << e << " ";   
+    out << " ->" << sched.dummy;     
+    out << endl << "rank:";    
+    for(auto r : sched.rank)
+        out << r << " ";        
+    return out;
+}
 void Position::opposite()
 {
     vector<int> new_proc_mappings = proc_mappings;
@@ -380,6 +391,16 @@ vector<int> Position::actors_by_mapping(int proc)
         {
             actors.push_back(i);
         }
+    }
+    return actors;
+}
+vector<int> Position::get_actors_by_proc(int proc_id) const
+{
+    vector<int> actors;
+    for(size_t i=0;i<proc_mappings.size();i++)
+    {
+        if(proc_mappings[i] == proc_id)
+            actors.push_back(i);
     }
     return actors;
 }
