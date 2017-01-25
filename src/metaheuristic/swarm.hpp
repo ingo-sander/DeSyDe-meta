@@ -35,7 +35,8 @@
 
 #include "../exceptions/runtimeexception.h"
 #include "particle.hpp"
-#include "population.hpp"
+#include "population.cpp"
+#include "population_data.hpp"
 using namespace std;
 /**
  * \class Swarm
@@ -43,39 +44,20 @@ using namespace std;
  * \brief The swarm class in PSO.
  *
  */
-class Swarm{
+class Swarm : public Population<Particle>{
 public: 
     Swarm(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
     ~Swarm();
-    void search();
     friend std::ostream& operator<< (std::ostream &out, const Swarm &swarm);
 private:    
-    Config& cfg;
-    shared_ptr<Mapping> mapping;
-    shared_ptr<Applications> applications;
-    vector<shared_ptr<Particle>> particle_set;
     vector<shared_ptr<Particle>> opposition_set;
-    const size_t no_objectives; /**< total number of objectives. */
-    const size_t no_particles; /**< total number of particles. */
-    const size_t no_generations; /**< total number of particles. */
-    const int no_threads;
-    int particle_per_thread;
-    ParetoFront par_f;
-    Memory long_term_memory;/** used in case of single objective.*/
-    Memory short_term_memory;/** used in case of single objective.*/
-    vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
-    ofstream out, out_csv, out_tex;;
-    bool stagnation;
-    const bool multi_obj = false;
-    typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
-    runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    int random_indx(int);/** returns index of a random index. */
-    void calc_fitness(int);/** calculates the fitness for particles in a thread. */ 
-    void update_position(int);/** updates the best position of particles in a thread. */ 
+    void update(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
     void evaluate_oppositions();/*! Evaluates the opposition particles and adds the good ones to the particle set.*/
     void merge_main_opposite();/*! Merges the opposition set with the main particle set.*/
-    void print();
+    void print_results();
+    bool termination();
+    bool is_converged();
     float average_speed();
     int no_converged_particles();
     void replace_converged_particles();

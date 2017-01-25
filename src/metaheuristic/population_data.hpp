@@ -1,3 +1,4 @@
+#pragma once
 /**
  * Copyright (c) 2013-2016, Nima Khalilzad   <nkhal@kth.se>
  * All rights reserved.
@@ -33,8 +34,8 @@
 #include <thread>
 #include <chrono>
 
-#include "../exceptions/runtimeexception.h"
 #include "individual.hpp"
+
 using namespace std;
 /**
  * \struct ParetoFront
@@ -86,47 +87,5 @@ struct Memory
     std::chrono::duration<double>  ins_time;
     const size_t max_size=1;
     friend std::ostream& operator<< (std::ostream &out, const Memory &m);
-};
-/**
- * \class Population
- *
- * \brief The population class for population-based metaheuristics.
- *
- */
-class Population{
-public: 
-    Population(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
-    ~Population();
-    void search();
-protected:    
-    Config& cfg;
-    shared_ptr<Mapping> mapping;
-    shared_ptr<Applications> applications;
-    vector<shared_ptr<Individual>> population;
-    const size_t no_objectives; /**< total number of objectives. */
-    const size_t no_individulas; /**< total number of particles. */
-    const size_t no_generations; /**< total number of generations. */
-    const int no_threads;
-    int individual_per_thread;
-    ParetoFront par_f;
-    Memory long_term_memory;/** used in case of single objective.*/
-    Memory short_term_memory;/** used in case of single objective.*/
-    vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
-    ofstream out, out_csv, out_tex;;
-    bool stagnation;
-    const bool multi_obj = false;
-    typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
-    runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    
-    void calc_fitness(int);/** calculates the fitness for individuals in a thread. */ 
-    virtual void update(int){};/** updates the population in a thread. */ 
-    virtual void init(){};/*!< Initializes the particles. */    
-    void print();
-    int no_reinits;
-    virtual bool termination(){return false;};
-    virtual bool is_converged(){return false;};
-    virtual void print_results(){};
-    bool is_timedout();
-    int random_indx(int max);
 };
 

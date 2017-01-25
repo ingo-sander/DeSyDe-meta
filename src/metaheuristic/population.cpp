@@ -1,6 +1,25 @@
-#include "population.hpp"
+#include <vector>
+#include <algorithm>
+#include <random>
+#include <iterator>
+#include <iostream>
+#include <functional>
+#include <thread>
+#include <chrono>
+#include "../exceptions/runtimeexception.h"
+#include "individual.hpp"
+#include "population_data.hpp"
 #include "plot.cpp"
-Population::Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& _cfg):
+/**
+ * \class Population
+ *
+ * \brief The population class for population-based metaheuristics.
+ *
+ */
+template <class T>
+class Population{
+public: 
+Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& _cfg):
                     cfg(_cfg),
                     mapping(_mapping),
                     applications(_application),
@@ -8,33 +27,32 @@ Population::Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _a
                     no_individulas(no_objectives*cfg.settings().particle_per_obj),
                     no_generations(cfg.settings().generation),
                     no_threads(std::thread::hardware_concurrency()),
-                    par_f(),
+                    current_generation(0),
+                    last_update(0),
+                    par_f(),                    
                     stagnation(false)
 {   
     individual_per_thread = no_individulas / no_threads;
     no_reinits = 0;
 }
-Population::~Population()
+~Population()
 {
     population.clear();
 }
 
-void Population::search()
+void search()
 {
     out.open(cfg.settings().output_path+"out/out_meta.txt");
     out_csv.open(cfg.settings().output_path+"out/data.csv");
     out_tex.open(cfg.settings().output_path+"out/plot.tex");
-    string sep="";         
-   for(size_t i=0;i<100;i++)
-       sep+="=";
-    auto last_update = 0;
+    
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
     auto dur_update = runTimer::now() - runTimer::now();
     std::thread t[no_individulas];
     
     size_t g = 0;
-    while(!termination())
+    while(termination())
     {
         if(is_converged())
         {
@@ -117,7 +135,10 @@ void Population::search()
             << endl;
    cout << stat.str() << endl;
    out << stat.str() << endl;         
-   
+   string sep="";         
+   for(size_t i=0;i<100;i++)
+       sep+="=";
+    
    out << sep << endl;
    if(cfg.settings().multi_obj) 
    {
@@ -137,7 +158,43 @@ void Population::search()
    
 }
 
-int Population::random_indx(int max)
+
+protected:    
+    Config& cfg;
+    shared_ptr<Mapping> mapping;
+    shared_ptr<Applications> applications;
+    vector<shared_ptr<T>> population;
+    const size_t no_objectives; /**< total number of objectives. */
+    const size_t no_individulas; /**< total number of particles. */
+    const size_t no_generations; /**< total number of generations. */
+    const int no_threads;
+    size_t individual_per_thread;
+    size_t current_generation;
+    size_t last_update;
+    ParetoFront par_f;
+    Memory long_term_memory;/** used in case of single objective.*/
+    Memory short_term_memory;/** used in case of single objective.*/
+    vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
+    ofstream out, out_csv, out_tex;;
+    bool stagnation;
+    const bool multi_obj = false;
+    typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
+    runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
+    int no_reinits;
+    
+    
+    virtual void update(int){};/** updates the population in a thread. */ 
+    virtual void init(){};/*!< Initializes the particles. */    
+    
+    
+    virtual bool termination(){return false;};
+    virtual bool is_converged(){return false;};
+    virtual void print_results(){};
+    bool is_timedout();
+    
+
+
+int random_indx(int max)
 {
     random_device rnd_device;
     uniform_int_distribution<int> dist(0, max);
@@ -146,83 +203,8 @@ int Population::random_indx(int max)
     int i = gen();
     return i;    
 }
-ParetoFront::ParetoFront()
-{  
-}
-bool ParetoFront::empty()
-{
-    return pareto.empty();
-}
-std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
-{
-    for(auto po : p.pareto)
-        out << tools::toString(po.fitness_func()) << " " 
-            << tools::toString(po.fitness) 
-            << endl;
-    return out;    
-}
-/**
- * Does pareto[indx] dominate p?
-*/
-bool ParetoFront::dominate(Position& p, int indx)
-{
-    if(p.empty())
-        return true;
-    for(auto f : p.fitness)    
-        if(f < 0)
-            return true;
-        
-    if(pareto.empty())    
-        return false;
-        
-    //return dominate(pareto[indx], p);        
-    return p.dominate(pareto[indx]);
-} 
-/**
- * Does p1 dominate p2?
- 
-bool ParetoFront::dominate(Position& p1, Position& p2)
-{
-    for(size_t i=0;i<p1.fitness.size();i++)
-    {
-        if(p1.fitness[i] > p2.fitness[i])
-            return false;
-    }
-    return true;
-} */
-bool ParetoFront::dominate(Position& p)
-{
-    /// -# when pareto is empty directly call dominate for indx=0
-    if(pareto.empty())
-            return dominate(p, 0);
-    for(size_t i=0;i<pareto.size();i++)
-    {
-        if(pareto[i].dominate(p) || pareto[i] == p)
-        {
-             return true;
-        }
-    }
-    return false;
-}
-bool ParetoFront::update_pareto(Position p)
-{
-    bool is_updated = false;
-    if(!dominate(p))
-    {
-        for(size_t i=0;i<pareto.size();i++)
-        {
-            if(p.dominate(pareto[i]))
-            {
-                 pareto.erase (pareto.begin()+i);
-            }           
-        }
-        pareto.push_back(p);
-        is_updated = true;
-    }
-    return is_updated;
-}
-
-void Population::calc_fitness(int t_id)
+/** calculates the fitness for individuals in a thread. */ 
+void calc_fitness(int t_id)
 {
     int start_id = t_id * individual_per_thread;
     int end_id = start_id + individual_per_thread;
@@ -234,66 +216,7 @@ void Population::calc_fitness(int t_id)
     }
 }
 
-bool Memory::empty()
-{
-    return mem.empty();
-}
-bool Memory::update_memory(Position new_p)
-{
-    if(mem.size() < max_size && !new_p.invalid())
-    {
-        mem.push_back(new_p);
-        return true;
-    }
-    if(exists_in_mem(new_p))
-        return false;
-        
-    bool added = false;
-    for(auto p: mem)
-    {
-        if((new_p.dominate(p)))
-        {
-            mem.push_back(new_p);
-            added = true;
-            break;
-        }
-    }
-    if(added)
-       remove_worst();
-    return added;   
-}
-bool Memory::exists_in_mem(Position& new_p)
-{
-    for(auto p: mem)
-    {
-        if(new_p == p)
-            return true;
-    }
-    return false;
-}
-void Memory::remove_worst()
-{
-    int worst_i=0;
-    for(size_t i=1;i<mem.size();i++)
-    {
-        if(mem[worst_i].dominate(mem[i]))
-        {
-            worst_i = i;            
-        }
-    }
-    mem.erase(mem.begin()+worst_i);
-}
-std::ostream& operator<< (std::ostream &out, const Memory &m)
-{
-    for(auto po : m.mem)
-        out << tools::toString(po.fitness_func()) << " " 
-            << tools::toString(po.fitness) 
-            << " updated at:" << std::chrono::duration_cast<std::chrono::seconds>(m.ins_time).count() << "s"
-            << endl;
-            
-    return out;    
-}
-void Population::print()
+void print()
 {
    vector<vector<int>> data;
    
@@ -327,4 +250,8 @@ void Population::print()
    out_csv << pl.csv;
    out_tex << pl.tex;
 }
+
+};
+
+
 
