@@ -52,7 +52,7 @@ void search()
     std::thread t[no_individulas];
     
     size_t g = 0;
-    while(termination())
+    while(is_timedout() == false && termination() == false)
     {
         if(is_converged())
         {
@@ -160,37 +160,43 @@ void search()
 
 
 protected:    
-    Config& cfg;
-    shared_ptr<Mapping> mapping;
-    shared_ptr<Applications> applications;
-    vector<shared_ptr<T>> population;
-    const size_t no_objectives; /**< total number of objectives. */
-    const size_t no_individulas; /**< total number of particles. */
-    const size_t no_generations; /**< total number of generations. */
-    const int no_threads;
-    size_t individual_per_thread;
-    size_t current_generation;
-    size_t last_update;
-    ParetoFront par_f;
-    Memory long_term_memory;/** used in case of single objective.*/
-    Memory short_term_memory;/** used in case of single objective.*/
-    vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
-    ofstream out, out_csv, out_tex;;
-    bool stagnation;
-    const bool multi_obj = false;
-    typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
-    runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
-    int no_reinits;
-    
-    
-    virtual void update(int){};/** updates the population in a thread. */ 
-    virtual void init(){};/*!< Initializes the particles. */    
-    
-    
-    virtual bool termination(){return false;};
-    virtual bool is_converged(){return false;};
-    virtual void print_results(){};
-    bool is_timedout();
+Config& cfg;
+shared_ptr<Mapping> mapping;
+shared_ptr<Applications> applications;
+vector<shared_ptr<T>> population;
+const size_t no_objectives; /**< total number of objectives. */
+const size_t no_individulas; /**< total number of particles. */
+const size_t no_generations; /**< total number of generations. */
+const int no_threads;
+size_t individual_per_thread;
+size_t current_generation;
+size_t last_update;
+ParetoFront par_f;
+Memory long_term_memory;/** used in case of single objective.*/
+Memory short_term_memory;/** used in case of single objective.*/
+vector<Memory> memory_hist;/** used for outputing the development of the solution.*/
+ofstream out, out_csv, out_tex;;
+bool stagnation;
+const bool multi_obj = false;
+typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
+runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
+int no_reinits;
+
+
+virtual void update(int){};/** updates the population in a thread. */ 
+virtual void init(){};/*!< Initializes the particles. */    
+
+
+virtual bool termination(){return false;};
+virtual bool is_converged(){return false;};
+virtual void print_results(){};
+bool is_timedout()
+{
+    if(cfg.settings().timeout_first == 0)
+        return false;
+    auto duration = runTimer::now() - t_start;
+    return (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > cfg.settings().timeout_first);
+}
     
 
 
