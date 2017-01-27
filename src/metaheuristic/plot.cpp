@@ -1,3 +1,4 @@
+#pragma once
 /**
  * Copyright (c) 2013-2016, Nima Khalilzad   <nkhal@kth.se>
  * All rights reserved.

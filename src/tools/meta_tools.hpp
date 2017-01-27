@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2016, George Ungureanu <ugeorge@kth.se>
+ * Copyright (c) 2013-2016, Nima Khalilzad   <nkhal@kth.se>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,58 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "systools.hpp"
-#include "stringtools.hpp"
-#include "containertools.hpp"
-#include "meta_tools.hpp"
+
+
+#ifndef TOOLS_METATOOLS_HPP
+#define TOOLS_METATOOLS_HPP
+
+#include <algorithm>
+#include <sstream>
+#include <fstream>
+#include <istream>
+#include <cstdlib>
+#include <list>
+#include <random>
+#include <iterator>
+#include <iostream>
+#include <functional>
+#include <vector>
+using namespace std;
+namespace tools {
+
+template<class T>
+static T bring_to_bound(T v, T l, T u)
+{
+    if(v < l)
+        return l;
+    if(v > u)
+        return u;
+    return v;    
+}
+
+template<class T>
+static vector<T> bring_v_to_bound(vector<T> v, T l, T u)
+{
+    vector<T> out;
+    for(auto i: v)
+        out.push_back(tools::bring_to_bound(i, l, u));
+    return out;    
+}
+
+template <class T>
+static float average(vector<T> v) 
+{
+    float avg = 0.0;
+    for(auto e : v)
+    {
+        avg+= e;
+    }
+    return avg/v.size();
+}
+/**
+ * @return a random int between 0 and max.
+ */
+int random_indx(int max);
+}//namespace
+
+#endif //TOOLS_METATOOLS_HPP

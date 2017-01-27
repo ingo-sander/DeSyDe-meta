@@ -6,7 +6,6 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     Individual(_mapping, _application, _multi_obj, _o_w),
                      objective(_objective),
                     best_local_position(_multi_obj, _o_w),
-                    best_global_position(_multi_obj, _o_w),
                     speed(no_actors, no_channels, no_processors),                    
                     w_t(_w_t),
                     w_lb(_w_lb),
@@ -17,17 +16,12 @@ Particle::Particle(const Particle& _p):
                     Individual(_p),
                     objective(_p.objective),
                     best_local_position(_p.best_local_position),
-                    best_global_position(_p.best_global_position),
                     speed(_p.speed),                    
                     w_t(_p.w_t),
                     w_lb(_p.w_lb),
                     w_gb(_p.w_gb),
                     max_w_t(_p.max_w_t) {}
 
-void Particle::set_best_global(Position p)
-{
-    best_global_position = p; 
-}
 Speed Particle::get_speed()
 {
     return speed;
@@ -123,7 +117,7 @@ void Particle::move()
     {
         current_position.proc_mappings[i] = Schedule::random_round((float) current_position.proc_mappings[i] + speed.proc_mappings[i]);                 
     }
-    current_position.proc_mappings = Speed::bring_v_to_bound(current_position.proc_mappings, 0, (int)no_processors-1);
+    current_position.proc_mappings = tools::bring_v_to_bound(current_position.proc_mappings, 0, (int)no_processors-1);
     for(size_t i=0;i<current_position.proc_modes.size();i++)
     {
         current_position.proc_modes[i] = Schedule::random_round((float) current_position.proc_modes[i] + speed.proc_modes[i]);                 

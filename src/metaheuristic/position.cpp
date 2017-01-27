@@ -435,11 +435,11 @@ int Position::select_random(vector<int> v)
 
 float Speed::average() const
 {
-    return average(proc_mappings);
+    return tools::average(proc_mappings);
 }
 void Speed::apply_bounds()
 {
     float ratio = 2;
     float no_processors = (float)proc_modes.size();
-    proc_mappings = bring_v_to_bound(proc_mappings, -no_processors/ratio, no_processors/ratio);
+    proc_mappings = tools::bring_v_to_bound(proc_mappings, -no_processors/ratio, no_processors/ratio);
 }

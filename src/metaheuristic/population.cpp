@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <algorithm>
 #include <random>
@@ -182,14 +183,13 @@ typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
 runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
 int no_reinits;
 
-
 virtual void update(int){};/** updates the population in a thread. */ 
 virtual void init(){};/*!< Initializes the particles. */    
-
-
-virtual bool termination(){return false;};
-virtual bool is_converged(){return false;};
-virtual void print_results(){};
+virtual bool termination(){return false;};/*!< @return true if the termination conditions are true. */    
+virtual bool is_converged(){return false;};/*!< @return true if the population is converged. */    
+/**
+ * @return true if the search is timed out.
+ */ 
 bool is_timedout()
 {
     if(cfg.settings().timeout_first == 0)
@@ -198,18 +198,10 @@ bool is_timedout()
     return (std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() > cfg.settings().timeout_first);
 }
     
-
-
-int random_indx(int max)
-{
-    random_device rnd_device;
-    uniform_int_distribution<int> dist(0, max);
-    mt19937 mersenne_engine(rnd_device());  
-    auto gen = std::bind(dist, mersenne_engine);
-    int i = gen();
-    return i;    
-}
-/** calculates the fitness for individuals in a thread. */ 
+/** 
+ * Calculates the fitness for a number of individuals in the population
+ * starting from \c t_id (\f$  \times \f$) \c individual_per_thread.  
+ */ 
 void calc_fitness(int t_id)
 {
     int start_id = t_id * individual_per_thread;
@@ -221,7 +213,9 @@ void calc_fitness(int t_id)
         population[i]->calc_fitness();        
     }
 }
-
+/**
+ * Prints the paretor front or memory_history.
+ */ 
 void print()
 {
    vector<vector<int>> data;
@@ -255,6 +249,16 @@ void print()
    Plot pl(titles, data);       
    out_csv << pl.csv;
    out_tex << pl.tex;
+}
+void print_results()
+{
+    string sep="";         
+   for(size_t i=0;i<100;i++)
+       sep+="=";
+    for(auto p : par_f.pareto)
+       out << p << endl << sep << endl;
+   for(auto p : population)
+        out << "individual:\n" << *p << endl << sep << endl;    
 }
 
 };

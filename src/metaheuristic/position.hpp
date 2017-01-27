@@ -33,6 +33,7 @@
 
 #include "../exceptions/runtimeexception.h"
 #include "../system/design.hpp"
+#include "../tools/tools.hpp"
 using namespace std;
 
 /**
@@ -81,7 +82,7 @@ public:
         rank.clear();
         elements.clear();
     }
-    int size()
+    size_t size()
     {
         return elements.size();
     }
@@ -131,34 +132,7 @@ struct Speed{
         vector<float> v(s, 0);
         generate(begin(v), end(v), gen); 
         return v;
-    }
-    template <class T>
-    static float average(vector<T> v) 
-    {
-        float avg = 0.0;
-        for(auto e : v)
-        {
-            avg+= e;
-        }
-        return avg/v.size();
-    }
-    template<class T>
-    static T bring_to_bound(T v, T l, T u)
-    {
-        if(v < l)
-            return l;
-        if(v > u)
-            return u;
-        return v;    
-    }
-    template<class T>
-    static vector<T> bring_v_to_bound(vector<T> v, T l, T u)
-    {
-        vector<T> out;
-        for(auto i: v)
-            out.push_back(bring_to_bound(i, l, u));
-        return out;    
-    }
+    }   
     float average() const;
     void apply_bounds();
     friend std::ostream& operator<< (std::ostream &out, const Speed &s);

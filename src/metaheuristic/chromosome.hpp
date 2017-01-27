@@ -37,19 +37,12 @@
 using namespace std;
 
 /**
- * \class Particle
+ * \class Chromosome
  *
- * \brief The particle class in PSO.
- *
- * This class abstracts a particle. Note that each particle contains 
- * 3 positions: (1) current position; (2) best local position, i.e., 
- * individual memory; (3) best global position, i.e., social memory.
- *
- * \note Each particle searchs for a particular objective.
- * \note The objective is set at the initialization. 
+ * \brief The chromosome class in GA.
  *
  */
-class Particle: public Individual{
+class Chromosome: public Individual{
 public:
     /**
      * Constructor method.
@@ -58,17 +51,14 @@ public:
      * @param _application
      *        Pointer to the application object.
      * @param _objective
-     *        Particle objective.
-     * @param _w_t
-     *        Maximum and initial weight of the current speed \c w_t.
-     * @param _w_lb
-     *        Weight of individual memory.
-     * @param _w_gb
-     *        Weight of social memory.
+     *        Chromosome objective.
+     * @param If we are solving a multiobjective problem
+     * @param _o_w
+     *        Weight of objective function.
      */ 
-    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool, vector<float>);
-    Particle(const Particle&);
-    ~Particle(){};   
+    Chromosome(shared_ptr<Mapping>, shared_ptr<Applications>, bool, vector<float>);
+    Chromosome(const Chromosome&);
+    ~Chromosome(){};
     /** Updates the current position based on the local best and global best.*/
     /**
      * Updates the position based on the speed.
@@ -82,28 +72,22 @@ public:
     /**
      * Implements a strategy to avoid stagnation.
      */
-    void avoid_stagnation(); 
+    void avoid_stagnation(){}; 
     /**
      * Overloads the << operator.
      */      
-    friend std::ostream& operator<< (std::ostream &out, const Particle &particle);        
+    //friend std::ostream& operator<< (std::ostream &out, const Chromosome &ch);        
 private:    
-    const int objective;/*!< Objective of the particle. */
-    Position best_local_position;/*!< Individual memory.*/
-    Speed speed;/*!< Particle \c speed \f$ V(t) \f$.*/
-    float w_t;/*!< Weight of current speed. \f$ w \f$ in \ref update_speed. */
-    float w_lb;/*!< Weight of local best. \f$ c_1 \f$ in \ref update_speed. */
-    float w_gb;/*!< Weight of global best.\f$ c_2 \f$ in \ref update_speed. */
-    const float delta_w_t = 0.01; /*!< Delta for decreasing \c w_t.*/
-    const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
-    const float max_w_t;/*!< Maximum \c w_t.*/ 
+    void crossover();/*!< The cross-over operation between this chromosome and best global chromosome.*/    
     /**
-     * Updates the speed of the particle using the following equation:
-     * \f[
-     * V(t+1) = wV(t) + c_1 y_1 (X(t)-Y(t)) + c_2 y_2 (X(t)-Y(t))
-     * \f]
+     * Performes crossover on the two input int vectors.
+     * @return int vector which is the crossover result.
      */ 
-    void update_speed();
-    void move();/*!< Moves the particle \f$ X(t+1) = X(t)+V(t+1) \f$.*/    
+    vector<int> crossover(vector<int>, vector<int>);
+    /**
+     * Performes crossover on the two input \b Schedule vectors.
+     * @return \b Schedule vector which is the crossover result.
+     */
+    vector<Schedule> crossover(vector<Schedule> new_s, vector<Schedule> s1, vector<int> map1, vector<Schedule> s2, vector<int> map2, int no_elems);
 };
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-2016, George Ungureanu <ugeorge@kth.se>
+ * Copyright (c) 2013-2016, Nima Khalilzad   <nkhal@kth.se>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "systools.hpp"
-#include "stringtools.hpp"
-#include "containertools.hpp"
-#include "meta_tools.hpp"
+
+#include <vector>
+#include <algorithm>
+#include <random>
+#include <iterator>
+#include <iostream>
+#include <functional>
+#include <thread>
+#include <chrono>
+
+#include "../exceptions/runtimeexception.h"
+#include "chromosome.hpp"
+#include "population.cpp"
+#include "population_data.hpp"
+using namespace std;
+/**
+ * \class GA_Population
+ *
+ * \brief The population class in GA.
+ *
+ */
+class GA_Population : public Population<Chromosome>{
+public: 
+    GA_Population(shared_ptr<Mapping>, shared_ptr<Applications>, Config&);
+    ~GA_Population();
+    friend std::ostream& operator<< (std::ostream &out, const GA_Population &swarm);
+private:    
+    void update(int);/** updates the best position of particles in a thread. */ 
+    void init();/*!< Initializes the particles. */    
+    void print_results();
+    bool termination();
+    bool is_converged();
+    int no_converged_particles();
+    int no_reinits;
+};
+

@@ -9,6 +9,7 @@ Individual::Individual(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _a
                     no_processors(mapping->getPlatform()->nodes()),
                     no_tdma_slots(mapping->getPlatform()->tdmaSlots()),
                     current_position(_multi_obj, _o_w),
+                    best_global_position(_multi_obj, _o_w),
                     no_invalid_moves(0),
                     multi_obj(_multi_obj),
                     obj_weights(_o_w)                                        
@@ -28,6 +29,7 @@ Individual::Individual(const Individual& _p):
                     no_processors(mapping->getPlatform()->nodes()),
                     no_tdma_slots(mapping->getPlatform()->tdmaSlots()),
                     current_position(_p.current_position),
+                    best_global_position(_p.best_global_position),
                     no_invalid_moves(0),
                     multi_obj(_p.multi_obj),
                     obj_weights(_p.obj_weights)
@@ -48,11 +50,11 @@ void Individual::build_schedules(Position& p)
 }
 void Individual::repair(Position &p)
 {
-    p.proc_mappings = Speed::bring_v_to_bound(p.proc_mappings, 0, (int)no_processors-1);
+    p.proc_mappings = tools::bring_v_to_bound(p.proc_mappings, 0, (int)no_processors-1);
      for(size_t i=0;i<no_processors;i++)
     {
        int no_proc_modes = mapping->getPlatform()->getModes(i);
-       p.proc_modes[i] = Speed::bring_to_bound(p.proc_modes[i], 0, no_proc_modes-1);
+       p.proc_modes[i] = tools::bring_to_bound(p.proc_modes[i], 0, no_proc_modes-1);
     }
     repair_tdma(p);    
     repair_sched(p);
@@ -63,7 +65,7 @@ void Individual::repair_sched(Position& p)
 {
     for(size_t proc=0;proc<p.proc_sched.size();proc++)
     {
-        p.proc_sched[proc].set_rank( Speed::bring_v_to_bound(p.proc_sched[proc].get_rank(), 0, (int)p.proc_sched[proc].get_rank().size()-1) );        
+        p.proc_sched[proc].set_rank( tools::bring_v_to_bound(p.proc_sched[proc].get_rank(), 0, (int)p.proc_sched[proc].get_rank().size()-1) );        
         for(size_t i=0;i<p.proc_sched[proc].get_elements().size();i++)
         {
             int a = p.proc_sched[proc].get_elements()[i];
@@ -89,7 +91,7 @@ void Individual::repair_send_sched(Position& p)
 {
     for(size_t proc=0;proc<p.send_sched.size();proc++)
     {
-        p.send_sched[proc].set_rank( Speed::bring_v_to_bound(p.send_sched[proc].get_rank(), 0, (int)p.send_sched[proc].get_rank().size()-1) );
+        p.send_sched[proc].set_rank( tools::bring_v_to_bound(p.send_sched[proc].get_rank(), 0, (int)p.send_sched[proc].get_rank().size()-1) );
         for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
         {
             int a = p.send_sched[proc].get_elements()[i];
@@ -137,7 +139,7 @@ void Individual::repair_rec_sched(Position& p)
      */ 
     for(size_t proc=0;proc<p.rec_sched.size();proc++)
     {
-        p.rec_sched[proc].set_rank( Speed::bring_v_to_bound(p.rec_sched[proc].get_rank(), 0, (int)p.rec_sched[proc].get_rank().size()-1) );
+        p.rec_sched[proc].set_rank( tools::bring_v_to_bound(p.rec_sched[proc].get_rank(), 0, (int)p.rec_sched[proc].get_rank().size()-1) );
         for(size_t i=0;i<p.rec_sched[proc].get_elements().size();i++)
         {
             int a = p.rec_sched[proc].get_elements()[i];
@@ -232,7 +234,7 @@ void Individual::init_random()
 }
 void Individual::repair_tdma(Position& p)
 {
-    p.tdmaAlloc = Speed::bring_v_to_bound(p.tdmaAlloc, 0, (int)no_tdma_slots);
+    p.tdmaAlloc = tools::bring_v_to_bound(p.tdmaAlloc, 0, (int)no_tdma_slots);
     vector<int> no_inout_channels(no_processors, 0);
     ///Random # tdma slots based on src and dst of channels
     for(size_t i=0;i<no_channels;i++)
@@ -365,4 +367,14 @@ void Individual::opposite()
     current_position.opposite();
     build_schedules(current_position);
     repair(current_position);       
+}
+void Individual::set_best_global(Position p)
+{
+    best_global_position = p; 
+}
+std::ostream& operator<< (std::ostream &out, const Individual &ind)
+{
+    out << "current position: ====================\n" << ind.current_position << endl;
+    out << "best g position: ====================\n" << ind.best_global_position << endl;
+    return out;
 }

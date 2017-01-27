@@ -28,7 +28,7 @@
 # MODULE PATH AND FILES
 #=======================
 
-CPP_FILES := stringtools.cpp systools.cpp solvers.cpp
+CPP_FILES := stringtools.cpp systools.cpp solvers.cpp meta_tools.cpp
 
 
 

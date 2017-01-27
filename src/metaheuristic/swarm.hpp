@@ -55,7 +55,6 @@ private:
     void init();/*!< Initializes the particles. */    
     void evaluate_oppositions();/*! Evaluates the opposition particles and adds the good ones to the particle set.*/
     void merge_main_opposite();/*! Merges the opposition set with the main particle set.*/
-    void print_results();
     bool termination();
     bool is_converged();
     float average_speed();

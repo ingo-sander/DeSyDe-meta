@@ -46,7 +46,7 @@ void Swarm::update(int t_id)
     {
         if(cfg.settings().multi_obj && !par_f.pareto.empty())
         {
-            int par_indx = random_indx(par_f.pareto.size()-1);        
+            int par_indx = tools::random_indx(par_f.pareto.size()-1);        
             population[i]->set_best_global(par_f.pareto[par_indx]);
             if(stagnation)
             {
@@ -56,7 +56,7 @@ void Swarm::update(int t_id)
         }
         if(!cfg.settings().multi_obj && !short_term_memory.empty())
         {
-            int mem_indx = random_indx(short_term_memory.mem.size()-1);        
+            int mem_indx = tools::random_indx(short_term_memory.mem.size()-1);        
             population[i]->set_best_global(short_term_memory.mem[mem_indx]);
             if(stagnation)
             {
@@ -105,7 +105,7 @@ float Swarm::average_speed()
         p_speeds.push_back(p->get_speed().average());
     if(p_speeds.empty())
         return 1; 
-    return Speed::average<float>(p_speeds);    
+    return tools::average<float>(p_speeds);    
 }
 int Swarm::no_converged_particles()
 {
@@ -128,32 +128,18 @@ void Swarm::replace_converged_particles()
         if(p->get_speed().average() == 0 || p->get_current_position().fitness_func() == short_term_memory.mem[0].fitness_func())
         {    
             shared_ptr<Particle> tmp_p(new Particle(*p));        
-            tmp_p->opposite();
-            /*cout << "p:" << *p << endl;
-            p = tmp_p;
-            cout << "new_p:" << *p << endl;
-            THROW_EXCEPTION(RuntimeException, "replaced" );*/
+            tmp_p->opposite();            
         }
     }
 }
 bool Swarm::termination()
 {
     current_generation++;
-    return (current_generation - last_update < no_generations);
+    return (current_generation - last_update > no_generations);
 }
 bool Swarm::is_converged()
 {
     current_generation++;
     return (no_converged_particles() > (int)no_individulas/4);
 }
-void Swarm::print_results()
-{
-    //dynamic_cast<DerivedType*>(&m_baseType);
-    string sep="";         
-   for(size_t i=0;i<100;i++)
-       sep+="=";
-    for(auto p : par_f.pareto)
-       out << p << endl << sep << endl;
-   for(auto p : population)
-        out << "position:\n" << *p << endl << sep << endl;    
-}
+

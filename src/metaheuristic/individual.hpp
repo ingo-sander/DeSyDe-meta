@@ -77,6 +77,13 @@ public:
      *         \c Position object.
      */ 
     Position get_current_position() const;
+     /** 
+     * The swarm object uses this function to update the social memory.
+     * The particle keeps a copy of the best global position.
+     * @param position 
+     *        \c Position object.
+     */   
+    void set_best_global(Position);
     virtual void update(){};/*!< Updates the individual based on an internal algorithm.*/
     /**
      * Overloads the << operator.
@@ -86,6 +93,7 @@ public:
      * Move the individual's current position to the opposite position.
      */
      void opposite(); 
+     friend std::ostream& operator<< (std::ostream &out, const Individual &ind);
 protected:    
     shared_ptr<Mapping> mapping;/*!< Pointer to \c Mapping object.*/
     shared_ptr<Applications> applications;/*!< Pointer to \c Application object.*/
@@ -95,6 +103,7 @@ protected:
     const size_t no_processors; /*!< Total number of processors. */
     const size_t no_tdma_slots; /*!< Total number of TDMA slots. */
     Position current_position;/*!< Current \c position.*/
+    Position best_global_position;/*!< Social memory.*/
     int no_invalid_moves;/*!< Number of moves in which the schedule resulted in deadlock (negative fitness).*/
     const int thr_invalid_mov = 25;/*!< Threshold for the number of invalid moves.*/
     const bool multi_obj;/*!< True if we are solving a multiobjective optimization problem.*/
