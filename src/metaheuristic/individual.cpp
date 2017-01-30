@@ -79,7 +79,7 @@ void Individual::repair_sched(Position& p)
                  */ 
                 if((a < (int) no_actors && b < (int) no_actors) && rank_a > rank_b && applications->dependsOn(a, b))
                 {
-                    if(Schedule::random_bool())
+                    if(random::random_bool())
                         p.proc_sched[proc].switch_ranks(i, j);
                 }
             }
@@ -122,7 +122,7 @@ void Individual::repair_send_sched(Position& p)
                        (rank_src_a < rank_src_b && rank_a > rank_b) 
                       )
                     {
-                        if(Schedule::random_bool())
+                        if(random::random_bool())
                             p.send_sched[proc].switch_ranks(i, j);                        
                     }
                 }
@@ -159,7 +159,7 @@ void Individual::repair_rec_sched(Position& p)
                     
                         if(rank_src_a < rank_src_b && rank_a > rank_b)
                         {
-                            if(Schedule::random_bool())
+                            if(random::random_bool())
                                 p.rec_sched[proc].switch_ranks(i, j);
                         }
                     }

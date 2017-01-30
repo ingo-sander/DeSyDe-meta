@@ -58,8 +58,8 @@ private:
     bool termination();
     bool is_converged();
     float average_speed();
-    int no_converged_particles();
+    int no_converged_individuals();
     void replace_converged_particles();
-    int no_reinits;
+    void new_population(){};
 };
 

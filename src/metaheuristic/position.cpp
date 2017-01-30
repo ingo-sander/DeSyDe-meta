@@ -201,6 +201,9 @@ int Schedule::get_rank_by_id(int elem_id) const
 }
 int Schedule::get_rank_by_element(int elem) const
 {
+    if(elements.empty())
+        THROW_EXCEPTION(RuntimeException, "elements vector is empty ");
+        
     for(size_t i=0;i<rank.size();i++)
     {
         if(elements[i] == elem)
@@ -300,7 +303,7 @@ void Schedule::rank_add(vector<float> _speed)
 }
 int Schedule::random_round(float f)
 {
-  if(random_bool())
+  if(random::random_bool())
     return ceil(f);
   else    
     return floor(f);  
@@ -322,17 +325,7 @@ void Schedule::repair_dist()
         }
     }
 }
-bool Schedule::random_bool()
-{
-  random_device rnd_device;
-  uniform_int_distribution<int> dist(0, 1);
-  mt19937 mersenne_engine(rnd_device());  
-  auto gen = std::bind(dist, mersenne_engine);
-  auto tmp = gen();
-  if(tmp == 0)
-      return true;
-  return false;  
-}
+
 int Schedule::random_unused_rank()
 {
     vector<int> unused_ranks;

@@ -1,10 +1,14 @@
 #include "swarm.hpp"
 
 Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, Config& _cfg):
-            Population(_mapping, _application, _cfg) {}
+            Population(_mapping, _application, _cfg) 
+{
+    name = "PSO";
+}
 
 void Swarm::init()
 {
+    LOG_INFO("Initializing the swarm reinit:"+tools::toString(no_reinits)); 
     no_reinits++;
     population.clear();
     opposition_set.clear();
@@ -15,16 +19,9 @@ void Swarm::init()
                                 cfg.settings().w_individual, cfg.settings().w_social,
                                 cfg.settings().multi_obj, cfg.settings().fitness_weights));        
         population.push_back(p);
-        opposition_set.push_back(p);
-        
-        //insert the opposite as well
-        /*shared_ptr<Particle> tmp_p(new Particle(*p));        
-        tmp_p->opposite();
-        population.push_back(tmp_p);        */
-        
+        opposition_set.push_back(p);        
     }   
-    LOG_INFO("Initializing the swarm"); 
-    //THROW_EXCEPTION(RuntimeException, "intit finished" );
+    
 }
 Swarm::~Swarm()
 {}
@@ -46,7 +43,7 @@ void Swarm::update(int t_id)
     {
         if(cfg.settings().multi_obj && !par_f.pareto.empty())
         {
-            int par_indx = tools::random_indx(par_f.pareto.size()-1);        
+            int par_indx = random::random_indx(par_f.pareto.size()-1);        
             population[i]->set_best_global(par_f.pareto[par_indx]);
             if(stagnation)
             {
@@ -56,7 +53,7 @@ void Swarm::update(int t_id)
         }
         if(!cfg.settings().multi_obj && !short_term_memory.empty())
         {
-            int mem_indx = tools::random_indx(short_term_memory.mem.size()-1);        
+            int mem_indx = random::random_indx(short_term_memory.mem.size()-1);        
             population[i]->set_best_global(short_term_memory.mem[mem_indx]);
             if(stagnation)
             {
@@ -107,7 +104,7 @@ float Swarm::average_speed()
         return 1; 
     return tools::average<float>(p_speeds);    
 }
-int Swarm::no_converged_particles()
+int Swarm::no_converged_individuals()
 {
     int cnt = 0;
     for(auto p : population)
@@ -140,6 +137,7 @@ bool Swarm::termination()
 bool Swarm::is_converged()
 {
     current_generation++;
-    return (no_converged_particles() > (int)no_individulas/4);
+    return (no_converged_individuals() > (int)no_individulas/4);
 }
+
 

@@ -33,7 +33,9 @@
 #include <functional>
 
 #include "position.hpp"
+
 using namespace std;
+using namespace tools;
 
 /**
  * \class Individual

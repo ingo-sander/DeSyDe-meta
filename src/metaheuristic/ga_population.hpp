@@ -50,12 +50,14 @@ public:
     ~GA_Population();
     friend std::ostream& operator<< (std::ostream &out, const GA_Population &swarm);
 private:    
+    vector<shared_ptr<Chromosome>> old_population;
     void update(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
     void print_results();
     bool termination();
     bool is_converged();
-    int no_converged_particles();
-    int no_reinits;
+    int no_converged_individuals();
+    void select_fittest();
+    void new_population();
 };
 

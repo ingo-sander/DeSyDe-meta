@@ -74,20 +74,28 @@ bool ParetoFront::update_pareto(Position p)
     }
     return is_updated;
 }
-
+void Memory::set_mem_size(int s)
+{
+    max_size = s;
+}
+Memory::Memory():
+               last_update(0),
+               max_size(1){}
 bool Memory::empty()
 {
     return mem.empty();
 }
-bool Memory::update_memory(Position new_p)
+bool Memory::update_memory(Position new_p, std::chrono::duration<double>  _time)
 {
+    if(exists_in_mem(new_p))
+        return false;
+    
     if(mem.size() < max_size && !new_p.invalid())
     {
         mem.push_back(new_p);
+        last_update = _time;
         return true;
     }
-    if(exists_in_mem(new_p))
-        return false;
         
     bool added = false;
     for(auto p: mem)
@@ -95,6 +103,7 @@ bool Memory::update_memory(Position new_p)
         if((new_p.dominate(p)))
         {
             mem.push_back(new_p);
+            last_update = _time;
             added = true;
             break;
         }
@@ -129,7 +138,7 @@ std::ostream& operator<< (std::ostream &out, const Memory &m)
     for(auto po : m.mem)
         out << tools::toString(po.fitness_func()) << " " 
             << tools::toString(po.fitness) 
-            << " updated at:" << std::chrono::duration_cast<std::chrono::seconds>(m.ins_time).count() << "s"
+            << " updated at:" << std::chrono::duration_cast<std::chrono::seconds>(m.last_update).count() << "s"
             << endl;
             
     return out;    

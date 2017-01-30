@@ -78,14 +78,16 @@ struct ParetoFront
  */
 struct Memory
 {
-    Memory(){};
+    Memory();
     vector<Position> mem;
+    std::chrono::duration<double>  last_update; 
     bool empty();
-    bool update_memory(Position);
+    bool update_memory(Position, std::chrono::duration<double>);
     void remove_worst();
     bool exists_in_mem(Position&);
-    std::chrono::duration<double>  ins_time;
-    const size_t max_size=1;
+    void set_mem_size(int);   
     friend std::ostream& operator<< (std::ostream &out, const Memory &m);
+private:    
+    size_t max_size;    
 };
 

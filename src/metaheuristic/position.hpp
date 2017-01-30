@@ -34,6 +34,7 @@
 #include "../exceptions/runtimeexception.h"
 #include "../system/design.hpp"
 #include "../tools/tools.hpp"
+#include "../tools/meta_tools.cpp"
 using namespace std;
 
 /**
@@ -60,7 +61,6 @@ public:
     void rank_add(vector<float>);
     /** Randomly slecets ceil or floor. */
     static int random_round(float);
-    static bool random_bool();
     int get_next(int);
     void switch_ranks(int, int);    
     vector<int> get_elements();

@@ -79,6 +79,8 @@ public:
     //friend std::ostream& operator<< (std::ostream &out, const Chromosome &ch);        
 private:    
     void crossover();/*!< The cross-over operation between this chromosome and best global chromosome.*/    
+    void cross_mut();/*!< The cross-over and mutation operation at the same time.*/    
+    vector<int> mutation(vector<int>);
     /**
      * Performes crossover on the two input int vectors.
      * @return int vector which is the crossover result.
