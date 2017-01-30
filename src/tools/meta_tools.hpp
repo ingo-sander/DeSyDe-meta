@@ -39,8 +39,10 @@
 #include <iostream>
 #include <functional>
 #include <vector>
+
 using namespace std;
 namespace tools {
+
 
 template<class T>
 static T bring_to_bound(T v, T l, T u)
@@ -71,10 +73,8 @@ static float average(vector<T> v)
     }
     return avg/v.size();
 }
-/**
- * @return a random int between 0 and max.
- */
-int random_indx(int max);
+
+
 }//namespace
 
 #endif //TOOLS_METATOOLS_HPP
