@@ -30,11 +30,12 @@ Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
                     no_threads(std::thread::hardware_concurrency()),
                     current_generation(0),
                     last_update(0),
-                    par_f(),                    
-                    stagnation(false)
+                    par_f(),      
+                    stagnation(false),
+                    no_reinits(0),
+                    last_reinit(0)
 {   
-    individual_per_thread = no_individulas / no_threads;
-    no_reinits = 0;
+    individual_per_thread = no_individulas / no_threads;    
 }
 ~Population()
 {
@@ -43,9 +44,9 @@ Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
 
 void search()
 {
-    out.open(cfg.settings().output_path+"out/out_meta.txt");
-    out_csv.open(cfg.settings().output_path+"out/data.csv");
-    out_tex.open(cfg.settings().output_path+"out/plot.tex");
+    out.open(cfg.settings().output_path+"out/out_"+name+".txt");
+    out_csv.open(cfg.settings().output_path+"out/data_"+name+".csv");
+    out_tex.open(cfg.settings().output_path+"out/plot_"+name+".tex");
     
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
@@ -76,28 +77,8 @@ void search()
         }
         
         dur_fitness += runTimer::now() - start_fitness;
-
-        ///Find the best individual
-        for(size_t p=0;p<population.size();p++)
-        {
-            if(cfg.settings().multi_obj)
-            {
-                short_term_memory.update_memory(population[p]->get_current_position());
-                if(par_f.update_pareto(population[p]->get_current_position()))
-                    last_update = g;
-            }
-            else
-            {
-                short_term_memory.update_memory(population[p]->get_current_position());
-                if(long_term_memory.update_memory(population[p]->get_current_position()))
-                {
-                    last_update = g;
-                    long_term_memory.ins_time = runTimer::now() - t_start;
-                    memory_hist.push_back(long_term_memory);
-                     out << long_term_memory.mem[0] << endl;   
-                }
-            }
-        }
+        
+        evaluate();
             
         auto start_update = runTimer::now();
         if(g+1- last_update < no_generations)        
@@ -114,7 +95,7 @@ void search()
                  t[i].join();
             }
         }   
-        //merge_main_opposite();
+        new_population();
         dur_update += runTimer::now() - start_update;     
         g++;
         
@@ -147,7 +128,10 @@ void search()
    }
    else
    {
-        out << long_term_memory << sep << endl;       
+        out << "long term memory:" << endl
+            << long_term_memory << sep << endl
+            << "short term memory:" << endl
+            << short_term_memory << sep << endl;       
         cout << long_term_memory << sep << endl;       
    }
    print_results();
@@ -182,11 +166,41 @@ const bool multi_obj = false;
 typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
 runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
 int no_reinits;
-
+int last_reinit;
+string name="meta";
 virtual void update(int){};/** updates the population in a thread. */ 
 virtual void init(){};/*!< Initializes the particles. */    
 virtual bool termination(){return false;};/*!< @return true if the termination conditions are true. */    
 virtual bool is_converged(){return false;};/*!< @return true if the population is converged. */    
+virtual void new_population(){};/*!< Updates the population. */ 
+/**
+ * Evaluates the population. 
+ */ 
+void evaluate()
+{
+    if(cfg.settings().multi_obj)
+    {
+        for(size_t p=0;p<population.size();p++)
+        {
+            short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start);
+            if(par_f.update_pareto(population[p]->get_current_position()))
+                last_update = current_generation;
+        }
+    }
+    else
+    {
+        for(size_t p=0;p<population.size();p++)
+        {
+            short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start);
+            if(long_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start))
+            {
+                last_update = current_generation;
+                memory_hist.push_back(long_term_memory);
+                 out << long_term_memory.mem[0] << endl;   
+            }
+        }
+    }
+}
 /**
  * @return true if the search is timed out.
  */ 
@@ -233,7 +247,7 @@ void print()
            vector<int> tmp;
            tmp.push_back(p.fitness_func());
            tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
-           auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.ins_time).count();
+           auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.last_update).count();
            tmp.push_back(durAll_ms);
            data.push_back(tmp);
        }
