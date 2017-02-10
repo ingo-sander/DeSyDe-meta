@@ -65,19 +65,19 @@ public:
      */ 
     vector<int> get_fitness();
     /** Calculate the fitness of the current position.*/
-    void calc_fitness();
+    void calc_fitness();   
     /** Create the next vector for a vector of schedule objects which 
      * can be either proc_sched, next_sched or rec_sched.
      * @param no_elements
      *        The number of elements in the schedule.
      * @return Next vector.
      */ 
-    vector<int> get_next(vector<Schedule>, int);
+     vector<int> get_next(vector<Schedule>, int) const;
    /**
      * Returns the current position of the particle.
      * @return position
      *         \c Position object.
-     */ 
+     */      
     Position get_current_position() const;
      /** 
      * The swarm object uses this function to update the social memory.
@@ -117,6 +117,40 @@ protected:
     void repair_send_sched(Position&);/*!< Repairs the \c send_sched in \ref Position.*/
     void repair_rec_sched(Position&);/*!< Repairs the \c rec_sched in \ref Position.*/
     void repair(Position&);/*!< Calls all other repair functions.*/
+    int count_proc_sched_violations(Position&);/*!< Counts the number of scheduling violations on processors.*/
+    int count_send_sched_violations(Position&);/*!< Counts the number of scheduling violations in send_sched.*/
+    int count_rec_sched_violations(Position&);/*!< Counts the number of scheduling violations in rec_sched.*/
+    int count_sched_violations(Position&);/*!< Counts the total number of scheduling violations.*/
+    /**
+     * @param p Reference to position.
+     * @param proc Processor ID.
+     * @param a actor ID.
+     * @param i index of a. 
+     * @param b actor ID.
+     * @param j index of b.  
+     * @return true if dependency between actor a and actor b is violated.
+     */ 
+    bool is_dep_sched_violation(Position &p, int proc, int a, int i, int b, int j);
+    /**
+     * @param p Reference to position.
+     * @param proc Processor ID.
+     * @param a channel ID.
+     * @param i index of a. 
+     * @param b channel ID.
+     * @param j index of b.  
+     * @return true if dependency between channel a and channel b is violated.
+     */ 
+    bool is_dep_send_sched_violation(Position &p, int proc, int a, int i, int b, int j);
+    /**
+     * @param p Reference to position.
+     * @param proc Processor ID.
+     * @param a channel ID.
+     * @param i index of a. 
+     * @param b channel ID.
+     * @param j index of b.  
+     * @return true if dependency between channel a and channel b is violated.
+     */ 
+    bool is_dep_rec_sched_violation(Position &p, int proc, int a, int i, int b, int j);
     vector<int> get_channel_by_src(Position&, int) const;
     /**
      * @param dst_proc_id Processor of the destination of the channels.
@@ -142,6 +176,6 @@ protected:
      * used by \ref update_speed function.
      * @return Random number between 0 and 1.
      */ 
-    float random_weight();
+    float random_weight();     
 };
 
