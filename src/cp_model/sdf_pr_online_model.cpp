@@ -112,6 +112,12 @@ SDFPROnlineModel::SDFPROnlineModel(Mapping* p_mapping, Config* _cfg):
         cout << "No program entities found !!!" << endl;
         throw 42;
     }
+    /**
+     * Forcing a given solution
+     */
+     //#include "hardcoded.solution" 
+
+
     cout << "Inserting mapping constraints \n";
 
     /**
@@ -126,7 +132,7 @@ SDFPROnlineModel::SDFPROnlineModel(Mapping* p_mapping, Config* _cfg):
     /**
      * Independent periodic tasks
      */
-    cout << "Inserting IPT scheduling constraints \n";
+    //[TODO] cout << "Inserting IPT scheduling constraints \n";
     if(apps->n_IPTTasks() > 0){
         IntVarArgs n_instances(*this, apps->n_IPTTasks(), 0, apps->getMaxNumberOfIPTInstances());
         IntVarArgs instancesOnNode(*this, apps->n_IPTTasks() * platform->nodes(), 0, apps->getMaxNumberOfIPTInstances() * platform->nodes());
@@ -192,7 +198,7 @@ SDFPROnlineModel::SDFPROnlineModel(Mapping* p_mapping, Config* _cfg):
     }
 #include "throughput.constraints"
 
-    cout << "Inserting presolver constraints \n";
+    //cout << "Inserting presolver constraints \n";
 //#include "presolve.constraints"
 
     if (cfg->is_presolved()) {
@@ -221,7 +227,7 @@ SDFPROnlineModel::SDFPROnlineModel(Mapping* p_mapping, Config* _cfg):
           rel(*this, t_mapping, IRT_NQ, proc);
         }
       }
-    }
+    
 
     switch (cfg->settings().criteria[0]) {
     case (Config::POWER):
@@ -245,7 +251,7 @@ SDFPROnlineModel::SDFPROnlineModel(Mapping* p_mapping, Config* _cfg):
       throw 42;
       break;
     }
-
+}
         for(size_t i = 0; i < channels.size(); i++){
             delete channels[i];
         }
@@ -447,7 +453,7 @@ void SDFPROnlineModel::print(std::ostream& out) const {
     out << "|| ";
     for(size_t ii = 0; ii < platform->nodes(); ii++){
         out << next[apps->n_SDFActors() + ii] << " ";
-    }
+    }     
     out << endl;
     out << "Rank: ";
     for(size_t ii = 0; ii < apps->n_SDFActors(); ii++){
@@ -455,7 +461,11 @@ void SDFPROnlineModel::print(std::ostream& out) const {
     }
     out << endl;
     out << "TDMA slots: " << tdmaAlloc << endl;
+    out << "Next: " << next << endl;
     out << "S-order: " << sendNext << endl;
+    out << "R-order: " << recNext << endl;
+    out << "sendbufferSz: " << sendbufferSz << endl;
+    out << "recbufferSz: " << recbufferSz << endl;    
     out << "wcct_b: " << wcct_b << endl;
     out << "wcct_s: " << wcct_s << endl;
     out << "R-order: " << recNext << endl;
@@ -638,4 +648,33 @@ vector<vector<int>> SDFPROnlineModel::extractCommSchedules() const {
     }
 
     return schedules;
+}
+void SDFPROnlineModel::set_design(vector<int> _map, vector<int> _mod, vector<int> _tdma, 
+                        vector<int> _next, vector<int> _sendNext, vector<int> _recNext)
+{
+    for(size_t i=0;i<_map.size();i++)
+    {
+        rel(*this, proc[i]==_map[i]);
+    }
+    for(size_t i=0;i<_mod.size();i++)
+    {
+        rel(*this, proc_mode[i]==_mod[i]);
+    }
+    for(size_t i=0;i<_tdma.size();i++)
+    {
+        rel(*this, tdmaAlloc[i]==_tdma[i]);
+    }
+    for(size_t i=0;i<_next.size();i++)
+    {
+        rel(*this, next[i]==_next[i]);
+    }
+    for(size_t i=0;i<_sendNext.size();i++)
+    {
+        rel(*this, sendNext[i]==_sendNext[i]);
+    }
+    for(size_t i=0;i<_recNext.size();i++)
+    {
+        rel(*this, recNext[i]==_recNext[i]);
+    }
+    
 }

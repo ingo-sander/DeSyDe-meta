@@ -151,7 +151,7 @@ public:
                 for(size_t i=0;i<apps->n_SDFApps();i++)
                 {
                     if(apps->getPeriodConstraint(i) == -1)
-                    cout << "BAB app: " << i << "period=" << b.period[i] << endl;
+                    //cout << "BAB app: " << i << "period=" << b.period[i] << endl;
                         {    rel(*this, period[i] < b.period[i]);break;}
                 }
                 break;
@@ -176,6 +176,16 @@ public:
     */ 
     static int valueProc(const Space& home, IntVar x, int i);
     typedef int (*IntBranchVal)(const Space& home, IntVar x, int i);    
+    /**
+     * Enforces a particular design, i.e., mapping, modes and schedules.
+     * @param _map Mappings
+     * @param _mod Modes
+     * @param _tdma TDMA slots
+     * @param _next Next variable
+     * @param _sendNext Send Next
+     * @param _recNext Receive Next 
+     */ 
+    void set_design(vector<int>,vector<int>,vector<int>,vector<int>,vector<int>,vector<int>);    
 };
 
 #endif
