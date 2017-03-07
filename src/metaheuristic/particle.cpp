@@ -2,8 +2,8 @@
 
 Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
                     int _objective, float _w_t, float _w_lb, float _w_gb, 
-                    bool _multi_obj, vector<float> _o_w):
-                    Individual(_mapping, _application, _multi_obj, _o_w),
+                    bool _multi_obj, vector<float> _o_w, vector<int> _penalty):
+                    Individual(_mapping, _application, _multi_obj, _o_w, _penalty),
                      objective(_objective),
                     best_local_position(_multi_obj, _o_w),
                     speed(no_actors, no_channels, no_processors),                    
@@ -39,6 +39,8 @@ void Particle::update()
     if(no_invalid_moves > thr_invalid_mov)  
     {
         init_random();
+        Speed s(no_actors, no_channels, no_processors);
+        speed = s;
         best_local_position = current_position;
         best_global_position = current_position;
         w_t = max_w_t;
@@ -65,20 +67,47 @@ void Particle::update_speed()
     {
         speed.proc_mappings[i] = w_t * speed.proc_mappings[i] +
                                  y1 * w_lb * (best_local_position.proc_mappings[i] - current_position.proc_mappings[i]) +
-                                 y2 * w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);
+                                 y2 * w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);      
     }
+    speed.proc_mappings = tools::round_2(speed.proc_mappings);
     for(size_t i=0;i<speed.proc_modes.size();i++)
     {
         speed.proc_modes[i] = w_t * speed.proc_modes[i] +
                                  y1 * w_lb * (best_local_position.proc_modes[i] - current_position.proc_modes[i]) +
                                  y2 * w_gb * (best_global_position.proc_modes[i] - current_position.proc_modes[i]);
     }
+    speed.proc_modes = tools::round_2(speed.proc_modes);
     for(size_t i=0;i<speed.tdmaAlloc.size();i++)
     {
+        if( speed.tdmaAlloc.size() != current_position.tdmaAlloc.size() ||
+            speed.tdmaAlloc.size() != best_local_position.tdmaAlloc.size() ||
+            speed.tdmaAlloc.size() != best_global_position.tdmaAlloc.size() )
+        {
+            cout << "s:" << speed.tdmaAlloc.size()
+                 << " c:" << current_position.tdmaAlloc.size()
+                 << " l:" << best_local_position.tdmaAlloc.size()
+                 << " g:" << best_global_position.tdmaAlloc.size()
+                 << endl;
+            cout << "update_speed failed!\n";
+        }    
+        try{
         speed.tdmaAlloc[i] = w_t * speed.tdmaAlloc[i] +
                                  y1 * w_lb * (best_local_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]) +
                                  y2 * w_gb *  (best_global_position.tdmaAlloc[i] - current_position.tdmaAlloc[i]);
+         }
+          catch(std::exception const& e)
+        {
+            cout << "s:" << speed.tdmaAlloc.size()
+                 << " c" << current_position.tdmaAlloc.size()
+                 << " l" << best_local_position.tdmaAlloc.size()
+                 << " g:" << best_global_position.tdmaAlloc.size()
+                 << endl;
+            cout << "update_speed failed!\n";
+            THROW_EXCEPTION(RuntimeException, e.what() );
+        }
+                                 
     }
+    speed.tdmaAlloc = tools::round_2(speed.tdmaAlloc);
     for(size_t i=0;i<speed.proc_sched.size();i++)
     {
         int cu_p = current_position.proc_mappings[i];
@@ -88,6 +117,7 @@ void Particle::update_speed()
                                  y1 * w_lb * (best_local_position.proc_sched[bl_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.proc_sched[bg_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i));       
     }
+    speed.proc_sched = tools::round_2(speed.proc_sched);
     for(size_t i=0;i<speed.send_sched.size();i++)
     {
         int src = applications->getChannel(i)->source;
@@ -98,6 +128,7 @@ void Particle::update_speed()
                                  y1 * w_lb * (best_local_position.send_sched[bl_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.send_sched[bg_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i));
     }
+    speed.send_sched = tools::round_2(speed.send_sched);
     for(size_t i=0;i<speed.rec_sched.size();i++)
     {
         int dst = applications->getChannel(i)->destination;
@@ -108,6 +139,7 @@ void Particle::update_speed()
                                  y1 * w_lb * (best_local_position.rec_sched[bl_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.rec_sched[bg_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i));
     }
+    speed.rec_sched = tools::round_2(speed.rec_sched);
     ///#- applying the speed bounds
     speed.apply_bounds();
 }
@@ -160,8 +192,7 @@ void Particle::move()
     }              
     /** \li Decrease w_t.*/
     if(w_t > min_w_t)
-        w_t = w_t - delta_w_t;
-    
+        w_t = w_t - delta_w_t;    
 }
 
 int Particle::get_objective()

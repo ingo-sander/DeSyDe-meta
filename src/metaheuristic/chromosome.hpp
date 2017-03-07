@@ -56,7 +56,7 @@ public:
      * @param _o_w
      *        Weight of objective function.
      */ 
-    Chromosome(shared_ptr<Mapping>, shared_ptr<Applications>, bool, vector<float>);
+    Chromosome(shared_ptr<Mapping>, shared_ptr<Applications>, bool, vector<float>, vector<int>);
     Chromosome(const Chromosome&);
     ~Chromosome(){};
     /** Updates the current position based on the local best and global best.*/

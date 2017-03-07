@@ -1,7 +1,7 @@
 #include "chromosome.hpp"
 Chromosome::Chromosome(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
-                    bool _multi_obj, vector<float> _o_w):
-                    Individual(_mapping, _application, _multi_obj, _o_w)
+                    bool _multi_obj, vector<float> _o_w, vector<int> _penalty):
+                    Individual(_mapping, _application, _multi_obj, _o_w, _penalty)
                     {}
                     
 Chromosome::Chromosome(const Chromosome& _c):

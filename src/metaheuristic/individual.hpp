@@ -56,7 +56,7 @@ public:
      * @param _obj_weights
      *        Weights used for calculating the objective function.
      */ 
-    Individual(shared_ptr<Mapping>, shared_ptr<Applications>, bool, vector<float>);
+    Individual(shared_ptr<Mapping>, shared_ptr<Applications>, bool, vector<float>, vector<int>);
     Individual(const Individual&);
     ~Individual(){};
     /** 
@@ -107,9 +107,12 @@ protected:
     Position current_position;/*!< Current \c position.*/
     Position best_global_position;/*!< Social memory.*/
     int no_invalid_moves;/*!< Number of moves in which the schedule resulted in deadlock (negative fitness).*/
-    const int thr_invalid_mov = 25;/*!< Threshold for the number of invalid moves.*/
+    const int thr_invalid_mov = 100;/*!< Threshold for the number of invalid moves.*/
     const bool multi_obj;/*!< True if we are solving a multiobjective optimization problem.*/
     vector<float> obj_weights;/*!< Used for calculating the objective functions.*/
+    set<int> cross_proc_deadlock_actors;/*!< Actors that cause deadlock across procs.*/
+    vector<int> penalty;/*!< Scheduling violation penalty values.*/
+    
     void init_random();/*!< Randomly initializes the individual.*/
     void build_schedules(Position&);/*!< builds proc_sched, send_sched and rec_sched based on the mappings.*/        
     void repair_tdma(Position&);/*!< Repairs the \c tdmaAlloc vector in \ref Position.*/
@@ -120,7 +123,7 @@ protected:
     int count_proc_sched_violations(Position&);/*!< Counts the number of scheduling violations on processors.*/
     int count_send_sched_violations(Position&);/*!< Counts the number of scheduling violations in send_sched.*/
     int count_rec_sched_violations(Position&);/*!< Counts the number of scheduling violations in rec_sched.*/
-    int count_sched_violations(Position&);/*!< Counts the total number of scheduling violations.*/
+    int count_sched_violations(Position&);/*!< Counts the total number of scheduling violations.*/        
     /**
      * @param p Reference to position.
      * @param proc Processor ID.
@@ -177,5 +180,15 @@ protected:
      * @return Random number between 0 and 1.
      */ 
     float random_weight();     
+    /**
+     * @param app_id The id of application.
+     * @param p The position which containts the schedule.
+     * @return True if these is a deadlock across processors in the input schedule.
+     */ 
+    bool cross_proc_deadlock(int app_id, Position &p);
+    bool cross_proc_deadlock(Position &p);
+    int estimate_sched_violations(Position& p);
+    void repair_cross_deadlock(Position& p);
+    vector<int> get_next_app(int elem, int app_id,  Schedule &s);
 };
 

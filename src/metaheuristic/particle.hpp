@@ -66,7 +66,7 @@ public:
      * @param _w_gb
      *        Weight of social memory.
      */ 
-    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool, vector<float>);
+    Particle(shared_ptr<Mapping>, shared_ptr<Applications>, int, float, float, float, bool, vector<float>, vector<int>);
     Particle(const Particle&);
     ~Particle(){};   
     /** Updates the current position based on the local best and global best.*/

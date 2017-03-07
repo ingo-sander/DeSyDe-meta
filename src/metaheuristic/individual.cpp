@@ -1,6 +1,6 @@
 #include "individual.hpp"
 Individual::Individual(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
-                    bool _multi_obj, vector<float> _o_w):
+                    bool _multi_obj, vector<float> _o_w, vector<int> _penalty):
                     mapping(_mapping),
                     applications(_application),
                     no_entities(mapping->getNumberOfApps()),
@@ -12,10 +12,11 @@ Individual::Individual(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _a
                     best_global_position(_multi_obj, _o_w),
                     no_invalid_moves(0),
                     multi_obj(_multi_obj),
-                    obj_weights(_o_w)                                        
+                    obj_weights(_o_w),
+                    penalty(_penalty)                                        
 {   
-    if(obj_weights.size() != no_entities + 2)
-        THROW_EXCEPTION(RuntimeException, tools::toString(no_entities + 2) +
+    if(obj_weights.size() != no_entities + 1)
+        THROW_EXCEPTION(RuntimeException, tools::toString(no_entities + 1) +
                         " obj_weights needed while " + tools::toString(obj_weights.size()) +
                         " provided");
     init_random();
@@ -32,7 +33,8 @@ Individual::Individual(const Individual& _p):
                     best_global_position(_p.best_global_position),
                     no_invalid_moves(0),
                     multi_obj(_p.multi_obj),
-                    obj_weights(_p.obj_weights)
+                    obj_weights(_p.obj_weights),
+                    penalty(_p.penalty)
 {}
 void Individual::build_schedules(Position& p)
 {
@@ -73,10 +75,10 @@ bool Individual::is_dep_send_sched_violation(Position &p, int proc, int a, int i
         int rank_a = p.send_sched[proc].get_rank_by_id(i);
         int rank_b = p.send_sched[proc].get_rank_by_id(j);
         /**
-         * if src_a and src_b are on the same proc and a and b send to the same destination,
+         * if src_a and src_b are on the same proc,
          * then the order of sending should be same as order of actor firings
          */ 
-        if(p.proc_mappings[src_a] == p.proc_mappings[src_b] && dst_a == dst_b) 
+        if(p.proc_mappings[src_a] == p.proc_mappings[src_b]) 
         {
             int rank_src_a = p.proc_sched[p.proc_mappings[src_a]].get_rank_by_element(src_a);
             int rank_src_b = p.proc_sched[p.proc_mappings[src_b]].get_rank_by_element(src_b);       
@@ -102,7 +104,7 @@ bool Individual::is_dep_send_sched_violation(Position &p, int proc, int a, int i
             {
                 return true;
             }
-        }
+        }         
     }
     
     return false;
@@ -206,8 +208,212 @@ int Individual::count_rec_sched_violations(Position& p)
 
 int Individual::count_sched_violations(Position& p)
 {
-    return count_proc_sched_violations(p) + count_send_sched_violations(p)
-            + count_rec_sched_violations(p);
+    int cnt = 0;
+    /*
+    for(size_t i=0;i<applications->n_SDFApps();i++)
+    {
+        if(cross_proc_deadlock(i, p))
+        cnt++;
+    }
+    */
+    
+    cnt += count_proc_sched_violations(p)
+        + count_send_sched_violations(p) + count_rec_sched_violations(p);
+    
+    p.cnt_violations = cnt;       
+    
+    if(cross_proc_deadlock(p))
+    {
+        cnt +=1;//larger penalty for cross proc deadlocks     
+        /*
+        cout << *this << endl
+        << "actors:" << tools::toString(cross_proc_deadlock_actors) << endl;
+        THROW_EXCEPTION(RuntimeException, "cross_proc_deadlock!");
+        */ 
+    }
+    
+    return cnt;
+}
+int Individual::estimate_sched_violations(Position& p)
+{
+    int cnt = 0;
+    cnt += count_proc_sched_violations(p);
+    
+    if(cnt == 0)
+        cnt += count_send_sched_violations(p) + count_rec_sched_violations(p);
+    
+    if(cnt == 0 && cross_proc_deadlock(p))
+        cnt ++;     
+    
+    p.cnt_violations = cnt;       
+    
+    return cnt;
+}
+bool Individual::cross_proc_deadlock(int app_id, Position &p)
+{
+    cross_proc_deadlock_actors.empty();
+    vector<int> roots = applications->get_root(app_id);
+    set<int> can_fire(roots.begin(), roots.end());
+    set<int> next_in_sched;
+    for(auto s : p.proc_sched)
+    {
+        int a = s.get_element_by_rank(0);
+        if((int) applications->getSDFGraph(a) != app_id)
+        {
+            vector<int> next = get_next_app(a, app_id, s);        
+            for(auto n : next)
+                next_in_sched.insert(n); 
+        }
+        else
+            next_in_sched.insert(a);
+    }
+    set<int> fired;
+    set<int> intersect_can_sched;
+    set_intersection(can_fire.begin(),can_fire.end(),next_in_sched.begin(),next_in_sched.end(),
+                        std::inserter(intersect_can_sched,intersect_can_sched.begin()));
+    ///# if the interserction is already empty, then we have deadlock
+    if(intersect_can_sched.empty() && !can_fire.empty())
+    {
+        cross_proc_deadlock_actors = can_fire;
+        return true;                 
+    }
+
+    while(!intersect_can_sched.empty())
+    {
+        ///# select one actor from intersect_can_sched
+        int a = *intersect_can_sched.begin();
+        can_fire.erase(a);
+        next_in_sched.erase(a);
+        ///# fire actor a
+        fired.insert(a);
+        ///# find next of a and add to next_in_sched set
+        int proc_a = p.proc_mappings[a];
+        vector<int> next = get_next_app(a, app_id, p.proc_sched[proc_a]);
+        for(auto n : next)
+            next_in_sched.insert(n); 
+        ///# add successors of a to can_fire set
+        vector<int> succ = applications->getSuccessors(a);
+        can_fire.insert(succ.begin(), succ.end());
+        intersect_can_sched.clear();
+        set_intersection(can_fire.begin(),can_fire.end(), next_in_sched.begin(), next_in_sched.end(),
+                            std::inserter(intersect_can_sched,intersect_can_sched.begin()));              
+        ///# if there are actors that can be fired but the intersection is empty
+        if(intersect_can_sched.empty() && !can_fire.empty())
+        {
+            /*
+            cout << "intersection is empty while " << tools::toString(can_fire)                 
+                 << " needs to be fired" << endl
+                 << "next_in_sched:" << tools::toString(next_in_sched) << endl ;
+            cout << "schedule is:" << tools::toString(p.proc_sched) << endl<< endl;
+            */
+            cross_proc_deadlock_actors = can_fire;
+            return true;
+        }
+    }    
+    return false;
+}
+bool Individual::cross_proc_deadlock(Position &p)
+{
+    cross_proc_deadlock_actors.empty();
+    vector<int> roots;
+    for(size_t i=0;i<applications->n_SDFApps();i++)
+    {
+        vector<int> tmp_r = applications->get_root(i);
+        roots.insert(roots.end(), tmp_r.begin(), tmp_r.end());
+    }
+     
+    set<int> can_fire(roots.begin(), roots.end());
+    set<int> next_in_sched;
+    for(auto s : p.proc_sched)
+    {
+        int a = s.get_element_by_rank(0);
+        next_in_sched.insert(a);
+    }
+    set<int> fired;
+    set<int> intersect_can_sched;
+    set_intersection(can_fire.begin(),can_fire.end(),next_in_sched.begin(),next_in_sched.end(),
+                        std::inserter(intersect_can_sched,intersect_can_sched.begin()));
+
+    ///# if the interserction is already empty, then we have deadlock
+    if(intersect_can_sched.empty() && !can_fire.empty()) 
+    {
+        cross_proc_deadlock_actors = can_fire;
+        return true;
+    }
+    while(!intersect_can_sched.empty())
+    {
+        ///# select one actor from intersect_can_sched
+        int a = *intersect_can_sched.begin();
+        can_fire.erase(a);
+        next_in_sched.erase(a);
+        ///# fire actor a
+        fired.insert(a);
+        ///# find next of a and add to next_in_sched set
+        int proc_a = p.proc_mappings[a];
+        next_in_sched.insert(p.proc_sched[proc_a].get_next(a));     
+        ///# add successors of a to can_fire set
+        vector<int> succ = applications->getSuccessors(a);
+        for(auto s : succ)
+        {
+            vector<int> pred = applications->getPredecessors(s);   
+            bool ready = true;
+            for(auto p : pred)         
+            {
+                bool is_in = fired.find(p) != fired.end();
+                if(!is_in)
+                {
+                    ready = false;
+                    //cout << s << " is not ready to be fired!\n";
+                    break;
+                }   
+            }
+            if(ready)
+                can_fire.insert(s);
+        }
+        //can_fire.insert(succ.begin(), succ.end());
+        intersect_can_sched.clear();
+        set_intersection(can_fire.begin(),can_fire.end(), next_in_sched.begin(), next_in_sched.end(),
+                            std::inserter(intersect_can_sched,intersect_can_sched.begin()));              
+        /*
+           cout << "firing:" << a 
+             << " next:" << p.proc_sched[proc_a].get_next(a)
+             << " can:" << tools::toString(succ)
+             << " next_set:" << tools::toString(next_in_sched)
+             << " can_set:" << tools::toString(can_fire)
+             << endl;
+        */ 
+        ///# if there are actors that can be fired but the intersection is empty
+        if(intersect_can_sched.empty() && !can_fire.empty())
+        {
+            /*
+            cout << "intersection is empty while " << tools::toString(can_fire)                 
+                 << " needs to be fired" << endl
+                 << "next_in_sched:" << tools::toString(next_in_sched) << endl ;
+            cout << "schedule is:" << tools::toString(p.proc_sched) << endl<< endl;
+            */            
+            cross_proc_deadlock_actors = can_fire;
+            return true;
+        }
+    }    
+    return false;
+}
+vector<int> Individual::get_next_app(int elem, int app_id,  Schedule &s)
+{
+    vector<int> next_elem;
+    if(elem >= (int) no_actors)
+        return next_elem;
+        
+    size_t next = s.get_next(elem);    
+    while(next < no_actors)
+    {
+        if((int) applications->getSDFGraph(next) == app_id)
+        {
+            next_elem.push_back(next);
+            return next_elem;
+        }
+        next = s.get_next(next);
+    }
+    return next_elem;
 }
 void Individual::repair(Position &p)
 {
@@ -219,8 +425,21 @@ void Individual::repair(Position &p)
     }
     repair_tdma(p);    
     repair_sched(p);
+    //repair_cross_deadlock(p);  
     repair_send_sched(p);
-    repair_rec_sched(p);    
+    repair_rec_sched(p);     
+}
+void Individual::repair_cross_deadlock(Position& p)
+{
+    cross_proc_deadlock(p);
+    for(auto a : cross_proc_deadlock_actors)
+    {
+        ///# set rank of a to random lower value 
+        int proc = p.proc_mappings[a];
+        int rank_a = p.proc_sched[proc].get_rank_by_element(a);
+        int new_rank = random::random_indx(rank_a);
+        p.proc_sched[proc].set_rank_by_element(a, new_rank);
+    }
 }
 void Individual::repair_sched(Position& p)
 {
@@ -235,7 +454,7 @@ void Individual::repair_sched(Position& p)
                 int b = p.proc_sched[proc].get_elements()[j];
                 if(is_dep_sched_violation(p, proc, a, i, b, j))
                 {
-                    if(random::random_bool())
+                    //if(random::random_bool())
                         p.proc_sched[proc].switch_ranks(i, j);
                 }
             }
@@ -256,7 +475,7 @@ void Individual::repair_send_sched(Position& p)
                 int b = p.send_sched[proc].get_elements()[j];
                 if(is_dep_send_sched_violation(p, proc, a, i, b, j))                
                 {
-                    if(random::random_bool())
+                    //if(random::random_bool())
                         p.send_sched[proc].switch_ranks(i, j);                        
                 }                
             }
@@ -281,7 +500,7 @@ void Individual::repair_rec_sched(Position& p)
                 int b = p.rec_sched[proc].get_elements()[j];
                 if(is_dep_rec_sched_violation(p, proc, a, i, b, j))
                 {
-                    if(random::random_bool())
+                    //if(random::random_bool())
                         p.rec_sched[proc].switch_ranks(i, j);
                 }
             }
@@ -349,7 +568,7 @@ void Individual::init_random()
     }
         
     build_schedules(current_position);
-    current_position.fitness.resize(no_entities + 2,0);///energy + memory violations + throughputs    
+    current_position.fitness.resize(no_entities + 1,0);///energy + memory violations + throughputs    
     repair(current_position);         
 }
 void Individual::repair_tdma(Position& p)
@@ -424,39 +643,81 @@ vector<int> Individual::get_next(vector<Schedule> sched_set, int no_elements) co
 void Individual::calc_fitness()
 {   
     try{ 
-        Design design(mapping, applications, current_position.proc_mappings, 
-                      current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
-                      get_next(current_position.send_sched, no_channels),
-                      get_next(current_position.rec_sched, no_channels), 
-                      current_position.tdmaAlloc);
-        
-        vector<int> prs = design.get_periods();
-        int no_sched_vio = count_sched_violations(current_position);
-
         current_position.fitness.clear();
-        current_position.fitness.resize(no_entities + 2,0);
-        int eng = design.get_energy();
-        for(size_t i=0;i< prs.size();i++)
-            current_position.fitness[i] = prs[i] + (prs[i])*((float)no_sched_vio)/(no_actors);
+        current_position.fitness.resize(no_entities + 1,0);
+        int no_sched_vio = count_sched_violations(current_position);
+        //int no_sched_vio = estimate_sched_violations(current_position);
+        
+        if(no_sched_vio == 0)
+        {            
+            Design design(mapping, applications, current_position.proc_mappings, 
+                          current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
+                          get_next(current_position.send_sched, no_channels),
+                          get_next(current_position.rec_sched, no_channels), 
+                          current_position.tdmaAlloc);
             
-        current_position.fitness[current_position.fitness.size()-2] = eng;
-        int no_mem_violations = 0;
-        for(auto m : design.get_slack_memory())
-            if(m < 0)
-                no_mem_violations++;
-                    
-        current_position.fitness[current_position.fitness.size()-1] = no_mem_violations;        
+            vector<int> prs = design.get_periods();
+            int eng = design.get_energy();
+            
+            int no_mem_violations = 0;
+            for(auto m : design.get_slack_memory())
+                if(m < 0)
+                    no_mem_violations++;
+            
+            current_position.cnt_violations = no_sched_vio+no_mem_violations;
+            
+            float penalty_ratio = ((float)current_position.cnt_violations);
+            for(size_t i=0;i< prs.size();i++)
+            {
+                if(prs[i] <= 0)
+                    current_position.fitness[i] = INT_MAX;
+                else
+                    current_position.fitness[i] = prs[i] + (prs[i])*penalty_ratio;    
+               
+               if(current_position.cnt_violations == 0 && prs[i] < 0)
+               {
+                   Design tmp_design(mapping, applications, current_position.proc_mappings, 
+                          current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
+                          get_next(current_position.send_sched, no_channels),
+                          get_next(current_position.rec_sched, no_channels), 
+                          current_position.tdmaAlloc);
+            
+                   tmp_design.set_print_debug(true);
+                   tmp_design.get_periods();
+                   cout << endl << *this << endl;
+                   cout << "communication violations:" << count_send_sched_violations(current_position) + count_rec_sched_violations(current_position) << endl;
+                   THROW_EXCEPTION(RuntimeException, "period is negative while there is zero violation!");
+               }    
+                
+            }
+            if(eng < 0)
+                 current_position.fitness[current_position.fitness.size()-1] = INT_MAX;
+            else    
+                current_position.fitness[current_position.fitness.size()-1] = eng + eng*penalty_ratio;
+        }    
+        else//if there is scheduling violations
+        {
+            int max_penalty = *max_element(penalty.begin(), penalty.end()-1);      
+            for(size_t i=0;i< penalty.size()-1;i++)
+                current_position.fitness[i] = (1+no_sched_vio) * max_penalty;//penalty[i];
+            
+            current_position.fitness[current_position.fitness.size()-1] = *(penalty.end()-1) * no_sched_vio;
+            
+        }
+      
+        //current_position.fitness[current_position.fitness.size()-1] = no_mem_violations;        
     }
     catch(std::exception const& e)
     {
+        cout << "calc fitness failed!\n";
         THROW_EXCEPTION(RuntimeException, e.what() );
     }
-    if(current_position.fitness[0] <= 0)
+    if(current_position.cnt_violations > 0)
     {
         no_invalid_moves++;
     }
     else
-        no_invalid_moves = 0;        
+        no_invalid_moves = 0;    
     
 }
 vector<int> Individual::get_fitness()
