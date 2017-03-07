@@ -56,10 +56,10 @@ private:
     void evaluate_oppositions();/*! Evaluates the opposition particles and adds the good ones to the particle set.*/
     void merge_main_opposite();/*! Merges the opposition set with the main particle set.*/
     bool termination();
-    bool is_converged();
     float average_speed();
     int no_converged_individuals();
     void replace_converged_particles();
     void new_population(){};
+    int no_converged_GB();
 };
 

@@ -51,13 +51,16 @@ public:
     friend std::ostream& operator<< (std::ostream &out, const GA_Population &swarm);
 private:    
     vector<shared_ptr<Chromosome>> old_population;
+    vector<shared_ptr<Chromosome>> next_population;
+    vector<pair<int, int>> parents;    
+    vector<pair<int, int>> possible_parents;  
     void update(int);/** updates the best position of particles in a thread. */ 
     void init();/*!< Initializes the particles. */    
     void print_results();
-    bool termination();
-    bool is_converged();
+    bool termination();;
     int no_converged_individuals();
     void select_fittest();
     void new_population();
+    void sort_population();
 };
 

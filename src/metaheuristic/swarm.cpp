@@ -8,19 +8,22 @@ Swarm::Swarm(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application
 
 void Swarm::init()
 {
-    LOG_INFO("Initializing the swarm reinit:"+tools::toString(no_reinits)); 
     no_reinits++;
     population.clear();
     opposition_set.clear();
+    last_reinit = current_generation;
     for(size_t i=0;i<no_individulas;i++)
     {
         shared_ptr<Particle> p(new Particle(mapping, applications, i%no_objectives,
                                 cfg.settings().w_current, 
                                 cfg.settings().w_individual, cfg.settings().w_social,
-                                cfg.settings().multi_obj, cfg.settings().fitness_weights));        
+                                cfg.settings().multi_obj, cfg.settings().fitness_weights, penalty));        
         population.push_back(p);
         opposition_set.push_back(p);        
     }   
+    LOG_INFO("Initializing the swarm reinit:"+tools::toString(no_reinits)
+            +" g:"+tools::toString(current_generation)
+            +" last:"+tools::toString(last_reinit)); 
     
 }
 Swarm::~Swarm()
@@ -134,10 +137,19 @@ bool Swarm::termination()
     current_generation++;
     return (current_generation - last_update > no_generations);
 }
-bool Swarm::is_converged()
-{
-    current_generation++;
-    return (no_converged_individuals() > (int)no_individulas/4);
-}
 
+int Swarm::no_converged_GB()
+{
+    int cnt = 0;
+    for(auto p : population)
+    {
+        if(p->get_current_position() == short_term_memory.mem[0])
+        {
+            cnt++;
+        }
+    }
+    if(cnt>10)
+    cout << cnt << " -> " << current_generation << endl;
+    return cnt;
+}
 

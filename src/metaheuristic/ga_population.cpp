@@ -5,6 +5,18 @@ GA_Population::GA_Population(shared_ptr<Mapping> _mapping, shared_ptr<Applicatio
 {
     short_term_memory.set_mem_size(1);
     name = "GA";
+    
+    int thresh = sqrt(no_individulas)+1;
+    for(int i=0;i<thresh;i++)
+    {
+        for(int j=0;j<thresh;j++)
+        {
+            pair<int,int> par (i,j);
+            //if(i != j)
+                possible_parents.push_back(par);
+        }
+    }
+   cout << "no_ind:" << no_individulas << " parents:" << possible_parents.size() << endl;
 }
 
 void GA_Population::init()
@@ -14,12 +26,14 @@ void GA_Population::init()
     last_reinit = current_generation;
     population.clear();
     old_population.clear();
+    next_population.clear();
     for(size_t i=0;i<no_individulas;i++)
     {
         shared_ptr<Chromosome> c(new Chromosome(mapping, applications, 
-                                cfg.settings().multi_obj, cfg.settings().fitness_weights));        
+                                cfg.settings().multi_obj, cfg.settings().fitness_weights, penalty));        
         population.push_back(c);        
         old_population.push_back(c);        
+        next_population.push_back(c);        
     }       
 }
 GA_Population::~GA_Population()
@@ -40,22 +54,15 @@ void GA_Population::update(int t_id)
         end_id = no_individulas;
     for(int i=start_id;i<end_id;i++)    
     {
-        if(cfg.settings().multi_obj && !par_f.pareto.empty())
-        {
-            int par_indx = random::random_indx(par_f.pareto.size()-1);        
-            population[i]->set_best_global(par_f.pareto[par_indx]);
-           
-            old_population[i] = population[i];
-            population[i]->update();
-        }
-        if(!cfg.settings().multi_obj && !short_term_memory.empty())
-        {
-            int mem_indx = random::random_indx(short_term_memory.mem.size()-1);        
-            population[i]->set_best_global(short_term_memory.mem[mem_indx]);
-           
-            old_population[i] = population[i];
-            population[i]->update();
-        }
+        /// Copy parent one because it will be updated
+        shared_ptr<Chromosome> parent1(new Chromosome(*population[parents[i].first]));
+        
+        shared_ptr<Chromosome> parent2 = population[parents[i].second];
+        
+        parent1->set_best_global(parent2->get_current_position());
+        parent1->update();
+        
+        next_population[i] = parent1;        
     }
     
 }
@@ -70,14 +77,7 @@ bool GA_Population::termination()
     current_generation++;
     return (current_generation - last_update > no_generations);
 }
-bool GA_Population::is_converged()
-{
-    //return (no_converged_individuals() > (int)no_individulas/4);
-    const int thresh = no_generations/10;
-    const int delta_update = current_generation - last_update;
-    const int delta_reinit = current_generation - last_reinit;
-    return (delta_update > thresh && delta_reinit > thresh);
-}
+
 void GA_Population::print_results()
 {
     string sep="";         
@@ -98,5 +98,26 @@ void GA_Population::select_fittest()
 }
 void GA_Population::new_population()
 {
-    select_fittest();
+    //select_fittest();
+    population = next_population;
+}
+void GA_Population::sort_population()
+{
+    std::sort(population.begin(), population.end(),
+                    [](shared_ptr<Chromosome> const a, shared_ptr<Chromosome> const b) -> bool 
+                    { return a->dominate(b); } );    
+    
+    //We also slecet parents here
+    parents.clear();
+    vector<int> all_indices;
+    for(size_t i=0;i<possible_parents.size();i++)
+        all_indices.push_back(i);
+    vector<int> slected_indices;
+    for(size_t i=0;i<no_individulas;i++)
+    {
+        int rand = random::random_indx(all_indices.size()-1);        
+        int indx = all_indices[rand];
+        parents.push_back(possible_parents[indx]);
+        all_indices.erase(all_indices.begin()+rand);
+    }     
 }

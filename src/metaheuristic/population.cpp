@@ -25,17 +25,22 @@ Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
                     mapping(_mapping),
                     applications(_application),
                     no_objectives(mapping->getNumberOfApps()+2),
-                    no_individulas(no_objectives*cfg.settings().particle_per_obj),
+                    no_individulas(cfg.settings().no_individulas),
                     no_generations(cfg.settings().generation),
-                    no_threads(std::thread::hardware_concurrency()),
                     current_generation(0),
                     last_update(0),
+                    last_short_term_update(0),
                     par_f(),      
                     stagnation(false),
                     no_reinits(0),
                     last_reinit(0)
 {   
+    if(cfg.settings().threads == 0)
+        no_threads = std::thread::hardware_concurrency();
+    else
+        no_threads = cfg.settings().threads;
     individual_per_thread = no_individulas / no_threads;    
+    init_penalty();
 }
 ~Population()
 {
@@ -79,6 +84,8 @@ void search()
         dur_fitness += runTimer::now() - start_fitness;
         
         evaluate();
+        
+        sort_population();
             
         auto start_update = runTimer::now();
         if(g+1- last_update < no_generations)        
@@ -152,10 +159,11 @@ vector<shared_ptr<T>> population;
 const size_t no_objectives; /**< total number of objectives. */
 const size_t no_individulas; /**< total number of particles. */
 const size_t no_generations; /**< total number of generations. */
-const int no_threads;
+int no_threads;
 size_t individual_per_thread;
 size_t current_generation;
 size_t last_update;
+size_t last_short_term_update;
 ParetoFront par_f;
 Memory long_term_memory;/** used in case of single objective.*/
 Memory short_term_memory;/** used in case of single objective.*/
@@ -168,11 +176,12 @@ runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of 
 int no_reinits;
 int last_reinit;
 string name="meta";
+vector<int> penalty;/*!< Vector of penalities, used when there is violations in the solution.*/
 virtual void update(int){};/** updates the population in a thread. */ 
 virtual void init(){};/*!< Initializes the particles. */    
 virtual bool termination(){return false;};/*!< @return true if the termination conditions are true. */    
-virtual bool is_converged(){return false;};/*!< @return true if the population is converged. */    
 virtual void new_population(){};/*!< Updates the population. */ 
+virtual void sort_population(){};/*!< Sorts the population from best to worst. */ 
 /**
  * Evaluates the population. 
  */ 
@@ -191,12 +200,25 @@ void evaluate()
     {
         for(size_t p=0;p<population.size();p++)
         {
-            short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start);
+            if(short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start))
+            {
+                last_short_term_update = current_generation;
+            }
             if(long_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start))
             {
                 last_update = current_generation;
                 memory_hist.push_back(long_term_memory);
-                 out << long_term_memory.mem[0] << endl;   
+                 out << "reinit:" << no_reinits << endl
+                     << "gen after reinit:" << current_generation - last_reinit << endl
+                     << "gen:" << current_generation << endl
+                     << "last reinit:" << last_reinit << endl
+                     << long_term_memory.mem[0] << endl;   
+                 ///#- print the next variables
+                 out << "proc_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].proc_sched, applications->n_SDFActors())) << endl;
+                 out << "send_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].send_sched, applications->n_SDFchannels())) << endl;
+                 out << "rec_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].rec_sched, applications->n_SDFchannels())) << endl;
+                 out << endl;
+                
             }
         }
     }
@@ -245,11 +267,14 @@ void print()
        for(auto p : m.mem)
        {
            vector<int> tmp;
-           tmp.push_back(p.fitness_func());
-           tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
-           auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.last_update).count();
-           tmp.push_back(durAll_ms);
-           data.push_back(tmp);
+           if(p.cnt_violations == 0)
+           {
+               tmp.push_back(p.fitness_func());
+               tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
+               auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.last_update).count();
+               tmp.push_back(durAll_ms);
+               data.push_back(tmp);
+           }
        }
 
    std::sort (data.begin(), data.end()); 
@@ -257,8 +282,7 @@ void print()
    titles.push_back("fitness");    
    for(int i=0;i<mapping->getNumberOfApps();i++)
        titles.push_back("app"+tools::toString(i)+"-period");
-   titles.push_back("energy");    
-   titles.push_back("memory");
+   titles.push_back("energy");
    titles.push_back("time");
    Plot pl(titles, data);       
    out_csv << pl.csv;
@@ -275,6 +299,32 @@ void print_results()
         out << "individual:\n" << *p << endl << sep << endl;    
 }
 
+void init_penalty()
+{
+    penalty.clear();
+    for(size_t i=0;i<mapping->getNumberOfApps();i++)
+    {
+        penalty.push_back(mapping->getSumWCETs(i));
+    }
+    int max_pow = 0;
+    for(size_t i=0;i<mapping->getPlatform()->nodes();i++)
+    {
+        
+        vector<int> pow = mapping->getPlatform()->getPowerCons(i);
+        int max = (*max_element(pow.begin(), pow.end()));
+        if(max > max_pow)
+            max_pow = max;
+    }
+    penalty.push_back(max_pow*mapping->getPlatform()->nodes()*mapping->max_utilization);
+    
+    
+    cout << "sum_wcet = " << tools::toString(penalty) << endl;
+}
+/*!< @return true if the population is converged. */    
+bool is_converged()
+{
+    return ((int) current_generation - (int)last_short_term_update - (int)last_reinit) > (int) cfg.settings().restart_generation;    
+}
 };
 
 
