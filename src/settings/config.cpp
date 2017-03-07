@@ -150,13 +150,17 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
   po::options_description meta("Metaheuristic options");
   meta.add_options()
       ("meta.generation",
-          po::value<size_t>()->default_value(10)->notifier(
+          po::value<size_t>()->default_value(1000)->notifier(
               boost::bind(&Config::setNoGenerations, this, _1)),
           "Number of generations used in the search.")
-      ("meta.particles",
+      ("meta.restart-generation",
+          po::value<size_t>()->default_value(100)->notifier(
+              boost::bind(&Config::setRestartGenerations, this, _1)),
+          "Number of generations before the search restarts.")
+      ("meta.individuals",
           po::value<size_t>()->default_value(10)->notifier(
-              boost::bind(&Config::setNoParticles, this, _1)),
-          "Number of particles per objective used in the search.")
+              boost::bind(&Config::setNoIndividuals, this, _1)),
+          "Number of individuals used in the search.")
       ("meta.w_individual",
           po::value<float>()->default_value(2.05)->notifier(
               boost::bind(&Config::setWeightInd, this, _1)),
@@ -173,6 +177,11 @@ int Config::parse(int argc, const char** argv) throw (IOException, InvalidArgume
           po::value<bool>()->default_value(true)->notifier(
               boost::bind(&Config::setMultiObj, this, _1)),
           "Whether multiobjective optimization or not.")
+      ("meta.threads",
+          po::value<size_t>()->default_value(0)->notifier(
+              boost::bind(&Config::setNoThreads, this, _1)),
+          "Number of threads used for search. 0 means number of cores is equal to the number of cores.")
+      
       ("meta.fitness_weights",
           po::value<vector<float>>()->multitoken()->notifier(
               boost::bind(&Config::setFitW, this, _1)),
@@ -503,8 +512,14 @@ void Config::setPresolverResults(shared_ptr<Config::PresolverResults> _p){
 void Config::setNoGenerations(size_t g) throw (InvalidFormatException){
   settings_.generation = g;
 }
-void Config::setNoParticles(size_t p) throw (InvalidFormatException){
-  settings_.particle_per_obj = p;
+void Config::setRestartGenerations(size_t g) throw (InvalidFormatException){
+  settings_.restart_generation = g;
+}
+void Config::setNoIndividuals(size_t p) throw (InvalidFormatException){
+  settings_.no_individulas = p;
+}
+void Config::setNoThreads(size_t t) throw (InvalidFormatException){
+  settings_.threads = t;
 }
 void Config::setWeightInd(float w) throw (InvalidFormatException){
   settings_.w_individual = w;
@@ -534,6 +549,9 @@ bool Config::doOptimize() const {
 }
 bool Config::is_presolved()
 {
+    if(!pre_results)  
+        return false;
+    
     if(pre_results->oneProcMappings.size() > 0)
         return true;
     else

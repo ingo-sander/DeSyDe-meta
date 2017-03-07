@@ -115,11 +115,13 @@ public:
     OutputPrintFrequency      out_print_freq;
     
    size_t generation;
-   size_t particle_per_obj;
+   size_t restart_generation;
+   size_t no_individulas;
    float  w_individual;
    float  w_social;
    float  w_current;
    bool   multi_obj;
+   size_t threads;
    vector<float> fitness_weights;
   };
   struct PresolverResults{
@@ -188,10 +190,12 @@ private:
   void setOutputFileType(const std::string &) throw (InvalidFormatException);
   void setOutputPrintFrequency(const std::string &) throw (InvalidFormatException);  
   void setNoGenerations(size_t) throw (InvalidFormatException);
-  void setNoParticles(size_t) throw (InvalidFormatException);
+  void setRestartGenerations(size_t) throw (InvalidFormatException);
+  void setNoIndividuals(size_t) throw (InvalidFormatException);
   void setWeightInd(float) throw (InvalidFormatException);
   void setWeightSoc(float) throw (InvalidFormatException);
   void setWeightCur(float) throw (InvalidFormatException);
+  void setNoThreads(size_t) throw (InvalidFormatException);
   void setMultiObj(bool) throw (InvalidFormatException);
   void setFitW(vector<float>) throw (InvalidFormatException);
 
