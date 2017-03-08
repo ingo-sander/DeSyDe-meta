@@ -518,7 +518,9 @@ public:
   /*!< returns the memory size of proc based on the current mappings */ 
   int getMemorySize(unsigned proc);
   /*!< returns the sum of largest WCETs for input app. */ 
-  int getSumWCETs(size_t app) const;              
+  int getSumWCETs(size_t app) const;    
+  /*!< returns the sum of largest WCCTs+ WC blockings for input app. */ 
+  int getSumWCCTs(size_t app) ;          
         
 };
 #endif

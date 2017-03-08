@@ -1365,3 +1365,17 @@ int Mapping::getSumWCETs(size_t app) const {
   }
   return sum;
 }
+int Mapping::getSumWCCTs(size_t app) {
+  int sum = 0;
+  vector<int> wcbts = wcBlockingTimes();
+  int wcbt = *max_element(wcbts.begin(), wcbts.end());
+  for (size_t i = 0; i < program->n_SDFchannels(); i++) 
+  {
+    int src_i = program->getChannel(i)->source;
+    if (program->getSDFGraph(src_i) == app) {
+      vector<int> wccts = wcTransferTimes(i);
+      sum += wcbt + *max_element(wccts.begin(), wccts.end());      
+    }
+  }
+  return sum;
+}
