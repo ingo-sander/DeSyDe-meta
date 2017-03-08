@@ -17,6 +17,9 @@ SDFGraph::SDFGraph(XMLdoc& xmlAppGraph) : xml(xmlAppGraph) {
   buildDictionaries();
   transform();
   createPathMatrix();
+  set_root_actors();
+  
+  
   if (_d) delete _d;
 
   LOG_DEBUG("SDFGraph intermediate representation built successfully");
@@ -774,4 +777,22 @@ void SDFGraph::setDesignConstraints(vector<char*> elements, vector<char*> values
       cout << "reading design constraints xml file error : " << e.what() << endl;
     }
   }
+}
+
+void SDFGraph::set_root_actors()
+{
+    for(auto a : actors)
+    {
+        auto preds = getPredecessors(a->id);
+        if(preds.empty())
+            root_actors.push_back(a);
+        //if initial tokens should be added
+    }
+}
+vector<int> SDFGraph::get_root()
+{
+    vector<int> roots;
+    for(auto a : root_actors)
+        roots.push_back(a->id);
+    return roots;    
 }

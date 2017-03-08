@@ -124,6 +124,9 @@ protected:
 
   //! Vector with all actors of the graph.
   vector<SDFActor*> actors;
+  
+  //! Vector with root actors of the graph, i.e., the ones that can fire first.
+  vector<SDFActor*> root_actors;
 
   //! Vector with all channels of the graph.
   vector<SDFChannel*> channels;
@@ -141,6 +144,8 @@ protected:
 
   void buildDictionaries();
 
+  void set_root_actors();
+  
   void calculateRepetitionVector(vector<rational<int>>& firing, string a);
 
   /**
@@ -409,7 +414,9 @@ public:
    * @param dir path to the directory where the file should be placed.
    */
   void outputGraphAsDot(const string &dir) const;
-
+  
+  vector<int> get_root();
+  
   std::string getString() const;
 
 };
