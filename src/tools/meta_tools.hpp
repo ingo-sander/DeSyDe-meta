@@ -63,6 +63,24 @@ static vector<T> bring_v_to_bound(vector<T> v, T l, T u)
     return out;    
 }
 
+
+/**
+ * @return Rounds to 2 digits precision.
+ */
+template <class T>
+static T round_2(T f)
+{
+  return floor(f*10000.0)/10000.0;
+}
+template <class T>
+static vector<T> round_2(vector<T> f)
+{
+    vector<T> out;
+    for(auto v: f)
+        out.push_back(round_2(v));
+    return out;
+}
+
 template <class T>
 static float average(vector<T> v) 
 {
@@ -70,11 +88,9 @@ static float average(vector<T> v)
     for(auto e : v)
     {
         avg+= e;
-    }
-    return avg/v.size();
+    }    
+    return round_2(avg/v.size());
 }
-
-
 }//namespace
 
 #endif //TOOLS_METATOOLS_HPP
