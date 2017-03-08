@@ -190,5 +190,7 @@ protected:
     int estimate_sched_violations(Position& p);
     void repair_cross_deadlock(Position& p);
     vector<int> get_next_app(int elem, int app_id,  Schedule &s);
+    vector<set<int>> get_comappings(vector<int> mappings);
+    vector<int> mapping_based_penalty(vector<int> mappings);
 };
 

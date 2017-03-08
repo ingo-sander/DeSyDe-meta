@@ -552,13 +552,12 @@ void Individual::init_random()
     auto gen_proc = std::bind(dist_proc, mersenne_engine);mersenne_engine();
     auto gen_tdma = std::bind(dist_proc, mersenne_engine);mersenne_engine();
     
-    current_position.proc_mappings.resize(no_actors, 0);
+    current_position.proc_mappings.resize(no_actors, 0);    
     current_position.proc_modes.resize(no_processors, 0);
     current_position.tdmaAlloc.resize(no_processors, 0);
     
     generate(begin(current_position.proc_mappings), end(current_position.proc_mappings), gen_proc); 
     generate(begin(current_position.tdmaAlloc), end(current_position.tdmaAlloc), gen_tdma);
-    
     /// -# Random proc_modes based on the number of modes for each processors
     for(size_t i=0;i<no_processors;i++)
     {
@@ -647,32 +646,36 @@ void Individual::calc_fitness()
         current_position.fitness.resize(no_entities + 1,0);
         int no_sched_vio = count_sched_violations(current_position);
         //int no_sched_vio = estimate_sched_violations(current_position);
-        
-        if(no_sched_vio == 0)
-        {            
-            Design design(mapping, applications, current_position.proc_mappings, 
+        Design design(mapping, applications, current_position.proc_mappings, 
                           current_position.proc_modes, get_next(current_position.proc_sched, no_actors),
                           get_next(current_position.send_sched, no_channels),
                           get_next(current_position.rec_sched, no_channels), 
                           current_position.tdmaAlloc);
             
+        int no_mem_violations = 0;
+        for(auto m : design.get_slack_memory())
+            if(m < 0)
+                no_mem_violations++;
+        
+        current_position.cnt_violations = no_sched_vio+no_mem_violations;
+
+        if(no_sched_vio == 0)
+        {            
             vector<int> prs = design.get_periods();
             int eng = design.get_energy();
-            
-            int no_mem_violations = 0;
-            for(auto m : design.get_slack_memory())
-                if(m < 0)
-                    no_mem_violations++;
-            
-            current_position.cnt_violations = no_sched_vio+no_mem_violations;
-            
-            float penalty_ratio = ((float)current_position.cnt_violations);
             for(size_t i=0;i< prs.size();i++)
             {
+                int delta_period = 0;    
+                if(applications->getPeriodConstraint(i) > 0 && prs[i] > applications->getPeriodConstraint(i))    
+                {
+                    delta_period = prs[i] - applications->getPeriodConstraint(i);
+                    //cout << "d_p:" << delta_period
+                    //<< endl;
+                }
                 if(prs[i] <= 0)
                     current_position.fitness[i] = INT_MAX;
                 else
-                    current_position.fitness[i] = prs[i] + (prs[i])*penalty_ratio;    
+                    current_position.fitness[i] = prs[i] + delta_period;    
                
                if(current_position.cnt_violations == 0 && prs[i] < 0)
                {
@@ -693,13 +696,13 @@ void Individual::calc_fitness()
             if(eng < 0)
                  current_position.fitness[current_position.fitness.size()-1] = INT_MAX;
             else    
-                current_position.fitness[current_position.fitness.size()-1] = eng + eng*penalty_ratio;
+                current_position.fitness[current_position.fitness.size()-1] = eng;
         }    
         else//if there is scheduling violations
         {
-            int max_penalty = *max_element(penalty.begin(), penalty.end()-1);      
+            vector<int> m_p = mapping_based_penalty(current_position.proc_mappings);
             for(size_t i=0;i< penalty.size()-1;i++)
-                current_position.fitness[i] = (1+no_sched_vio) * max_penalty;//penalty[i];
+                current_position.fitness[i] = (1+no_sched_vio) * m_p[i];//penalty[i];
             
             current_position.fitness[current_position.fitness.size()-1] = *(penalty.end()-1) * no_sched_vio;
             
@@ -752,6 +755,56 @@ void Individual::opposite()
 void Individual::set_best_global(Position p)
 {
     best_global_position = p; 
+}
+vector<set<int>> Individual::get_comappings(vector<int> mappings)
+{
+    vector<set<int>> co_mappings;
+    vector<set<int>> app_mappings;
+    set<int> procs;
+    for(size_t i=0;i<no_entities;i++)
+    {
+        co_mappings.push_back(procs);
+        app_mappings.push_back(procs);
+    }
+    for(size_t i=0;i<no_actors;i++)
+    {
+        int app = applications->getSDFGraph(i);
+        app_mappings[app].insert(mappings[i]);
+    }
+    for(size_t i=0;i<no_entities;i++)
+    {
+        for(size_t j=0;j<no_entities;j++)
+        {
+            set<int> shared_procs;
+            if(i!=j)
+            {
+                set_intersection(app_mappings[i].begin(),app_mappings[i].end(),app_mappings[j].begin(),app_mappings[j].end(),
+                        std::inserter(shared_procs,shared_procs.begin()));
+            }
+            if(shared_procs.size() > 0)
+            {
+                co_mappings[i].insert(j);
+                co_mappings[j].insert(i);
+            }
+        }
+    }    
+    return co_mappings;
+}
+vector<int> Individual::mapping_based_penalty(vector<int> mappings)
+{
+    vector<int>  m_penalty(no_entities, 0);    
+    vector<set<int>> co_mapps = get_comappings(mappings);
+    for(size_t i;i<no_entities;i++)
+    {
+        m_penalty[i] = penalty[i];
+        for(auto app: co_mapps[i])
+        {
+            int p = penalty[app];
+            if(p > m_penalty[i])
+                m_penalty[i] = p;
+        }
+    }
+    return m_penalty;
 }
 std::ostream& operator<< (std::ostream &out, const Individual &ind)
 {
