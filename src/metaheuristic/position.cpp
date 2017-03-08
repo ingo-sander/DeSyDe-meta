@@ -1,7 +1,8 @@
 #include "position.hpp"
 Position::Position(bool _multi_obj, vector<float> _w):
             multi_obj(_multi_obj),
-            weights(_w)
+            weights(_w),
+            cnt_violations(0)
             {
             };
 Position::~Position()
@@ -20,7 +21,8 @@ Position::Position(const Position &obj)
     send_sched = obj.send_sched;
     rec_sched = obj.rec_sched;
     fitness = obj.fitness;   
-    weights = obj.weights;              
+    weights = obj.weights;   
+    cnt_violations = obj.cnt_violations;           
 }
 void Position::print_multi_obj()
 {
@@ -64,6 +66,7 @@ Position& Position::operator=(const Position& p)
     fitness = p.fitness;
     weights = p.weights;
     multi_obj = p.multi_obj;
+    cnt_violations = p.cnt_violations;   
     proc_sched.clear();
     send_sched.clear();
     rec_sched.clear();
@@ -89,7 +92,12 @@ bool Position::dominate(Position& p_in) const
         
     if(p_in.empty() || p_in.invalid())
         return true;
-              
+    /*
+    if(cnt_violations < p_in.cnt_violations)
+        return true;
+    if(cnt_violations > p_in.cnt_violations)
+        return false;              
+    */    
     if(multi_obj)
     {
         for(size_t i=0;i<fitness.size();i++)
@@ -123,6 +131,8 @@ bool Position::empty() const
 }
 bool Position::invalid() const
 {
+    /*if(cnt_violations > 0)
+        return true;*/
     for(auto f : fitness)
         if(f < 0)
             return true;   
@@ -142,15 +152,10 @@ int Position::weighted_sum(int a, int b, int c, float w1, float w2)
 }
 std::ostream& operator<< (std::ostream &out, const Position &p)
 {
-    out << "proc_mappings: ";
-    for(auto m : p.proc_mappings)
-        out << m << " ";
-    out << endl << "proc_modes:";    
-    for(auto m : p.proc_modes)
-        out << m << " ";   /*
-    out << endl << "tdmaAlloc:";    
-    for(auto t : p.tdmaAlloc)
-        out << t << " ";
+    out << "proc_mappings:" << tools::toString(p.proc_mappings);
+    out << endl << "proc_modes:" << tools::toString(p.proc_modes);    
+    out << endl << "tdmaAlloc:" << tools::toString(p.tdmaAlloc);    
+    
     out << endl << "proc_sched -----";    
     for(auto s : p.proc_sched)
         out << s;
@@ -159,10 +164,11 @@ std::ostream& operator<< (std::ostream &out, const Position &p)
         out << s;
     out << endl << "rec_sched -----";        
     for(auto r : p.rec_sched)
-        out << r << " ";    */
+        out << r << " ";    
     out << endl << "fitness -----\n";        
     for(auto f : p.fitness)
-        out << f << " ";                
+        out << f << " ";         
+    out << "\nno violations:" << p.cnt_violations;               
     return out;
 }
 
@@ -231,6 +237,7 @@ void Schedule::set_rank_by_element(int elem, int _rank)
         if(elements[i] == elem)
         {
             rank[i] = _rank;
+            repair_dist();
             return;
         }
     }
@@ -428,7 +435,7 @@ int Position::select_random(vector<int> v)
 
 float Speed::average() const
 {
-    return tools::average(proc_mappings);
+    return tools::average(proc_mappings)+tools::average(proc_sched);
 }
 void Speed::apply_bounds()
 {

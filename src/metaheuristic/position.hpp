@@ -108,12 +108,16 @@ private:
 struct Speed{
     Speed(int no_actors, int no_channels, int no_processors)
     {
-        proc_sched = random_v(no_actors, -no_actors/no_processors, no_actors/no_processors);
-        send_sched = random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
-        rec_sched =  random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
-        proc_mappings = random_v(no_actors, -no_processors/2, no_processors/2);
+        //proc_sched = random_v(no_actors, -no_actors/no_processors, no_actors/no_processors);
+        //send_sched = random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
+        //rec_sched =  random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
+        //proc_mappings = random_v(no_actors, -no_processors/2, no_processors/2);
+        proc_sched = random_v(no_actors, -2, 2);
+        send_sched = random_v(no_channels, -2, 2);
+        rec_sched =  random_v(no_channels, -2, 2);
+        proc_mappings = random_v(no_actors, -2, 2);
         proc_modes = random_v(no_actors, -1, 1);
-        tdmaAlloc = random_v(no_actors, -1, 1);
+        tdmaAlloc = random_v(no_processors, -1, 1);
     }
     vector<float> proc_sched;
     vector<float> send_sched;
@@ -156,6 +160,7 @@ public:
     vector<int> get_actors_by_proc(int) const;    
     vector<int> fitness;
     vector<float> weights;
+    int cnt_violations;
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
     Position(const Position &obj);
