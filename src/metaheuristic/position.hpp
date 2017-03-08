@@ -159,6 +159,7 @@ public:
     vector<int> tdmaAlloc;     
     vector<int> get_actors_by_proc(int) const;    
     vector<int> fitness;
+    int penalty;
     vector<float> weights;
     int cnt_violations;
     friend std::ostream& operator<< (std::ostream &out, const Position &p);

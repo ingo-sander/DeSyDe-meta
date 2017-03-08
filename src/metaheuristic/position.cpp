@@ -1,6 +1,7 @@
 #include "position.hpp"
 Position::Position(bool _multi_obj, vector<float> _w):
             multi_obj(_multi_obj),
+            penalty(0), 
             weights(_w),
             cnt_violations(0)
             {
@@ -21,6 +22,7 @@ Position::Position(const Position &obj)
     send_sched = obj.send_sched;
     rec_sched = obj.rec_sched;
     fitness = obj.fitness;   
+    penalty = obj.penalty;
     weights = obj.weights;   
     cnt_violations = obj.cnt_violations;           
 }
@@ -64,6 +66,7 @@ Position& Position::operator=(const Position& p)
     proc_modes = p.proc_modes;
     tdmaAlloc = p.tdmaAlloc;
     fitness = p.fitness;
+    penalty = p.penalty;
     weights = p.weights;
     multi_obj = p.multi_obj;
     cnt_violations = p.cnt_violations;   
@@ -100,6 +103,8 @@ bool Position::dominate(Position& p_in) const
     */    
     if(multi_obj)
     {
+        if(penalty > p_in.penalty)
+            return false;
         for(size_t i=0;i<fitness.size();i++)
         {
             if(fitness[i] > p_in.fitness[i])
@@ -122,7 +127,7 @@ float Position::fitness_func() const
     float f = 0;
     for(size_t i=0;i<weights.size();i++)
         f += (float) fitness[i] * weights[i];
-    
+    f+= penalty;
     return f;
 }
 bool Position::empty() const
