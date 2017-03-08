@@ -304,7 +304,7 @@ void init_penalty()
     penalty.clear();
     for(size_t i=0;i<mapping->getNumberOfApps();i++)
     {
-        penalty.push_back(mapping->getSumWCETs(i));
+        penalty.push_back(mapping->getSumWCETs(i) + mapping->getSumWCCTs(i));        
     }
     int max_pow = 0;
     for(size_t i=0;i<mapping->getPlatform()->nodes();i++)
