@@ -665,17 +665,15 @@ void Individual::calc_fitness()
             int eng = design.get_energy();
             for(size_t i=0;i< prs.size();i++)
             {
-                int delta_period = 0;    
                 if(applications->getPeriodConstraint(i) > 0 && prs[i] > applications->getPeriodConstraint(i))    
                 {
-                    delta_period = prs[i] - applications->getPeriodConstraint(i);
-                    //cout << "d_p:" << delta_period
-                    //<< endl;
+                    int delta_period = prs[i] - applications->getPeriodConstraint(i);
+                    current_position.penalty += delta_period + mapping_based_penalty(current_position.proc_mappings)[i];
                 }
                 if(prs[i] <= 0)
                     current_position.fitness[i] = INT_MAX;
                 else
-                    current_position.fitness[i] = prs[i] + delta_period;    
+                    current_position.fitness[i] = prs[i];    
                
                if(current_position.cnt_violations == 0 && prs[i] < 0)
                {
@@ -800,8 +798,8 @@ vector<int> Individual::mapping_based_penalty(vector<int> mappings)
         for(auto app: co_mapps[i])
         {
             int p = penalty[app];
-            if(p > m_penalty[i])
-                m_penalty[i] = p;
+            //if(p > m_penalty[i])
+                m_penalty[i] += p;
         }
     }
     return m_penalty;
