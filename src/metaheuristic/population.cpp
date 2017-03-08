@@ -212,7 +212,8 @@ void evaluate()
                      << "gen after reinit:" << current_generation - last_reinit << endl
                      << "gen:" << current_generation << endl
                      << "last reinit:" << last_reinit << endl
-                     << long_term_memory.mem[0] << endl;   
+                     << long_term_memory.mem[0] << endl
+                     << "total_fitness:" << long_term_memory.mem[0].fitness_func() << endl;   
                  ///#- print the next variables
                  out << "proc_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].proc_sched, applications->n_SDFActors())) << endl;
                  out << "send_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].send_sched, applications->n_SDFchannels())) << endl;
