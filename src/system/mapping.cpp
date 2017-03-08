@@ -1355,3 +1355,13 @@ vector<int> Mapping::getProcCosts() const {
   return proc_cost;
 }
 
+int Mapping::getSumWCETs(size_t app) const {
+  int sum = 0;
+  for (size_t i = 0; i < program->n_SDFActors(); i++) {
+    if (program->getSDFGraph(i) == app) {
+      vector<int> wcets = getWCETsModes(i);
+      sum += *max_element(wcets.begin(), wcets.end());      
+    }
+  }
+  return sum;
+}
