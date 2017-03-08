@@ -121,7 +121,7 @@ bool Applications::dependsOn(size_t id0, size_t id1){
     return false;
   }else{ //TODO add later: if id0 and id1 are sdf, but in different applications
     int app0 = getSDFGraph(id0);
-    int app1 = getSDFGraph(id1);
+    int app1 = getSDFGraph(id1); 
     if(app0 != app1){
       return false;
     }else{
@@ -584,4 +584,12 @@ std::ostream& operator<< (std::ostream &out, const Applications &apps) {
     apps.n_iptTasks    << " pr tasks "           << 
     endl;
   return out;
+}
+vector<int> Applications::get_root(int app_id)
+{
+    vector<int> roots = sdfApps[app_id]->get_root();
+    for(size_t i=0;i<roots.size();i++)
+        roots[i] += offsets[app_id];
+    
+    return roots;    
 }

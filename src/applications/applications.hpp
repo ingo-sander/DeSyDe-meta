@@ -216,6 +216,10 @@ public:
    */ 
   void set_const(string app_name, int period_const, int latency_const);
   /**
+   * @return vector of actor ids that are the roots of the input application
+   */ 
+  vector<int> get_root(int app_id);
+  /**
    * Prints applications
    */ 
   friend std::ostream& operator<< (std::ostream &out, const Applications &apps); 
