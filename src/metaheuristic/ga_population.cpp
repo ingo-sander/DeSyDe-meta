@@ -15,8 +15,7 @@ GA_Population::GA_Population(shared_ptr<Mapping> _mapping, shared_ptr<Applicatio
             //if(i != j)
                 possible_parents.push_back(par);
         }
-    }
-   cout << "no_ind:" << no_individulas << " parents:" << possible_parents.size() << endl;
+    }   
 }
 
 void GA_Population::init()
