@@ -71,8 +71,7 @@ void Design::check_inputs()
 }
 void Design::constructMSAG() {
   //cout << "\tDesign::constructMSAG()" << endl;
-   bool printDebug = false;//TODO: remove prints
-  //first, figure out how many actors there will be in the MSAG, in order to
+   //first, figure out how many actors there will be in the MSAG, in order to
   //initialize channel-matrix and actor-vector for the state of SSE
   n_msagActors = no_actors;
   for(size_t i = 0; i < no_channels; i++){
@@ -118,6 +117,14 @@ void Design::constructMSAG() {
       int block_actor = no_actors + channel_count;
       int send_actor = block_actor + 1;
       int rec_actor = send_actor + 1;
+      if(printDebug)
+      {
+          cout << "[" << i
+               << "] block_actor:" << block_actor
+               << " send_actor:" << send_actor
+               << " rec_actor:" << rec_actor
+               << endl;
+       }
       //store mapping between block/send/rec_actor and channel i
       channelMapping.push_back(i); //[block_actor] = i;
       channelMapping.push_back(i); //[send_actor] = i;
@@ -663,7 +670,6 @@ void Design::calc_periods(){
     periods.clear();
     periods.resize(applications->n_SDFApps(), 0);
     vector<int> msagMap(applications->n_SDFApps(), 0);
-    bool printDebug = false;
     
     if(applications->n_SDFApps() > 1){
     //check which application graphs are mapped to same processor (= combined into the same MSAG)
@@ -737,10 +743,11 @@ void Design::calc_periods(){
       }
     }
     constructMSAG(msagMap);
-
+    
     if(printDebug){
       //if(next.assigned() && wcet.assigned())
       {
+        printThroughputGraph();
         cout << "trying to print " << b_msags.size() << " boost-msags." << endl;
         for(size_t t = 0; t < b_msags.size(); t++){
           cout << "Graph " << t << endl;
@@ -771,17 +778,46 @@ void Design::calc_periods(){
 
       //do MCR analysis
       max_cr = maximum_cycle_ratio(*m, vim, ew1, ew2, &cc);
+      
+      /* Check if mcr is correct .*/
+      int sum_w1 = 0;
+      int sum_w2 = 0;
+      for(t_critCycl::iterator itr = cc.begin(); itr != cc.end(); ++itr){
+          sum_w1 += get(edge_weight, *m, *itr);     
+          sum_w2 += get(edge_weight2, *m, *itr);     
+        }
+      if(max_cr> 0 && sum_w1/sum_w2 != max_cr)
+      {
+          cout << "mcr:" << max_cr 
+               << " sum_w1/sum_w2:" << sum_w1/sum_w2
+               << endl
+               << *this << endl;
+          if(max_cr < sum_w1/sum_w2)
+          max_cr = sum_w1/sum_w2;
+          //THROW_EXCEPTION(RuntimeException, "sum_w1/sum_w2 != max_cr" );      
+      }
       msag_mcrs.push_back(max_cr);
       if(printDebug){
+        cout << "mcr is:" << maximum_cycle_ratio(*m, vim, ew1, ew2, &cc) << endl;
         cout << "Period of app(s) " << tools::toString(result[msag_mcrs.size()-1]) << ": ";
         cout <<  max_cr << endl;
         cout << "Critical cycle:\n";
+        int sum_w1 = 0;
+        int sum_w2 = 0;
         for(t_critCycl::iterator itr = cc.begin(); itr != cc.end(); ++itr){
-          cout << "(" << vim[source(*itr, b_msag)] << "," << vim[target(*itr, b_msag)] << ") ";
+          cout << "(" << vim[source(*itr, *m)] << "," << vim[target(*itr, *m)] << ") ";          
+          cout << "weights:(" << get(edge_weight, *m, *itr) << ", " << get(edge_weight2, *m, *itr) << ")"
+               << endl;          
+          sum_w1 += get(edge_weight, *m, *itr);     
+          sum_w2 += get(edge_weight2, *m, *itr);     
         }
-        cout << endl;
+        cout << "sum_w1:" << sum_w1
+             << " sum_w2:" << sum_w2
+             << endl;
       }
+      
     }
+    
     for(size_t i = 0; i < msag_mcrs.size(); i++){
       for(auto r: result[i]){
         periods[r] = msag_mcrs[i];        
@@ -789,7 +825,7 @@ void Design::calc_periods(){
     }
 
   }else{ //only a single application
-    constructMSAG();
+    constructMSAG();    
     using namespace boost;
     int max_cr; /// maximum cycle ratio
     typedef std::vector<graph_traits<boost_msag_des>::edge_descriptor> t_critCycl;
@@ -815,15 +851,28 @@ void Design::calc_periods(){
         out.close();
         printThroughputGraphAsDot(".");
       }
-
+      
+      /* Check if mcr is correct .*/
+      int sum_w1 = 0;
+      int sum_w2 = 0;
       cout << "Maximum cycle ratio is " << max_cr << endl;
       cout << "Critical cycle:\n";
       for(t_critCycl::iterator itr = cc.begin(); itr != cc.end(); ++itr){
         cout << "(" << vim[source(*itr, b_msag)] << "," << vim[target(*itr, b_msag)] << ") ";
-      }
+        cout << "weights:(" << get(edge_weight, b_msag, *itr) << ", " << get(edge_weight2, b_msag, *itr) << ")"
+               << endl;          
+          
+            sum_w1 += get(edge_weight, b_msag, *itr);     
+            sum_w2 += get(edge_weight2, b_msag, *itr);     
+        }
+        cout << "sum_w1:" << sum_w1
+             << " sum_w2:" << sum_w2
+             << endl;
       cout << endl;
     }
 }
+//
+
 }
 
 void Design::init_vectors(){
@@ -1017,7 +1066,6 @@ struct myGraph {
 };
 
 void Design::constructMSAG(vector<int> &msagMap) {
-  bool printDebug = false;
   if(printDebug)
     cout << "\tThroughputMCR::constructMSAG(vector<int> &msagMap)" << endl;
 
@@ -1080,6 +1128,14 @@ void Design::constructMSAG(vector<int> &msagMap) {
       int block_actor = no_actors + channel_count;
       int send_actor = block_actor + 1;
       int rec_actor = send_actor + 1;
+      if(printDebug)
+      {
+          cout << "[" << i
+               << "] block_actor:" << block_actor
+               << " send_actor:" << send_actor
+               << " rec_actor:" << rec_actor
+               << endl;
+       }
       //add the block actor as a successor of ch_src[i]
       SuccessorNode succB;
       succB.successor_key = block_actor;
@@ -1573,7 +1629,7 @@ void Design::constructMSAG(vector<int> &msagMap) {
   }
 
   if(printDebug){
-    //printThroughputGraphAsDot(".");
+    printThroughputGraphAsDot(".");
   }
 }
 
@@ -1690,4 +1746,34 @@ std::ostream& operator<< (std::ostream &out, const Design &des)
     out << endl;
              
     return out;
+}
+
+void Design::printThroughputGraph() const {
+  cout << "-------------------------------------------------" << endl;
+  for(auto it = msaGraph.begin(); it != msaGraph.end(); ++it){
+    int node = it->first;
+    cout << node << ": ";
+    vector<SuccessorNode> succs = (vector<SuccessorNode> ) (it->second);
+    for(auto itV = succs.begin(); itV != succs.end(); ++itV){
+      cout << "(";
+      if(((SuccessorNode) (*itV)).successor_key < (int) no_actors){
+        cout << ((SuccessorNode) (*itV)).successor_key << "; ";
+      }else{
+        int src = applications->getChannel(((SuccessorNode) (*itV)).channel)->source;
+        int dst = applications->getChannel(((SuccessorNode) (*itV)).channel)->destination;
+        if(((((SuccessorNode) (*itV)).successor_key - no_actors) % 3) == 0){
+          cout << "b" << src << "-" << dst;
+        }else if(((((SuccessorNode) (*itV)).successor_key - no_actors) % 3) == 1){
+          cout << "s" << src << "-" << dst;
+        }else{
+          cout << "r" << src << "-" << dst;
+        }
+        cout << "[" << ((SuccessorNode) (*itV)).successor_key << "]; ";
+      }
+      cout << ((SuccessorNode) (*itV)).delay << "; ";
+      //cout << ((SuccessorNode) (*itV)).min_tok << "; ";
+      cout << ((SuccessorNode) (*itV)).max_tok << ")";
+    }
+    cout << endl;
+  }
 }

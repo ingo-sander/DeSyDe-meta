@@ -84,6 +84,8 @@ public:
     vector<int> get_periods();
     int get_energy();
     vector<int> get_slack_memory();
+    void printThroughputGraph() const ;
+    void set_print_debug(bool f) {printDebug = f;};
     friend std::ostream& operator<< (std::ostream &out, const Design &des);
 private:
     shared_ptr<Mapping> mapping; /**< reference to the mapping class. */
@@ -114,6 +116,7 @@ private:
     vector<int> periods;
     int energy;
     size_t n_msagActors;
+    bool printDebug = false;
     /**
      * Constructs Mapping and Scheduling Aware Graph (MSAG).
      * The code is adopted from the ThroughputMCR class
