@@ -142,7 +142,20 @@ struct Speed{
     friend std::ostream& operator<< (std::ostream &out, const Speed &s);
 };
 /**
- * \class Position
+ * \struct Domain
+ * 
+ * \brief Stores domain and value of a decision variable.
+ */ 
+struct Domain{
+    set<int> domain;
+    int val_indx = 0;
+    int value();
+    int index();
+    void set_domain(set<int>);
+    void set_index(int indx);
+};
+/**
+ * \struct Position
  *
  * \brief Stores the position of particles.
  */

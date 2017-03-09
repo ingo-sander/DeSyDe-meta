@@ -448,3 +448,23 @@ void Speed::apply_bounds()
     float no_processors = (float)proc_modes.size();
     proc_mappings = tools::bring_v_to_bound(proc_mappings, -no_processors/ratio, no_processors/ratio);
 }
+int Domain::value()
+{
+    set<int>::iterator it = domain.begin();
+    std::advance(it, val_indx);
+    return *(it);
+}
+int Domain::index()
+{
+    return val_indx;
+}
+void Domain::set_domain(set<int> d)
+{
+    domain = d;
+}
+void Domain::set_index(int indx)
+{
+    if(indx > domain.size())
+        THROW_EXCEPTION(RuntimeException, "domain index is larger than domain size" );
+    val_indx = indx;
+}
