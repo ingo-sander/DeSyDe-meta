@@ -66,8 +66,8 @@ void Particle::update_speed()
     for(size_t i=0;i<speed.proc_mappings.size();i++)
     {
         speed.proc_mappings[i] = w_t * speed.proc_mappings[i] +
-                                 y1 * w_lb * (best_local_position.proc_mappings[i] - current_position.proc_mappings[i]) +
-                                 y2 * w_gb * (best_global_position.proc_mappings[i] - current_position.proc_mappings[i]);      
+                                 y1 * w_lb * (best_local_position.proc_mappings[i].index() - current_position.proc_mappings[i].index()) +
+                                 y2 * w_gb * (best_global_position.proc_mappings[i].index() - current_position.proc_mappings[i].index());      
     }
     speed.proc_mappings = tools::round_2(speed.proc_mappings);
     for(size_t i=0;i<speed.proc_modes.size();i++)
@@ -110,9 +110,9 @@ void Particle::update_speed()
     speed.tdmaAlloc = tools::round_2(speed.tdmaAlloc);
     for(size_t i=0;i<speed.proc_sched.size();i++)
     {
-        int cu_p = current_position.proc_mappings[i];
-        int bl_p = best_local_position.proc_mappings[i];
-        int bg_p = best_global_position.proc_mappings[i];
+        int cu_p = current_position.proc_mappings[i].value();
+        int bl_p = best_local_position.proc_mappings[i].value();
+        int bg_p = best_global_position.proc_mappings[i].value();
         speed.proc_sched[i] = w_t * speed.proc_sched[i] +
                                  y1 * w_lb * (best_local_position.proc_sched[bl_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.proc_sched[bg_p].get_relative_rank_by_element(i) - current_position.proc_sched[cu_p].get_relative_rank_by_element(i));       
@@ -121,9 +121,9 @@ void Particle::update_speed()
     for(size_t i=0;i<speed.send_sched.size();i++)
     {
         int src = applications->getChannel(i)->source;
-        int cu_p = current_position.proc_mappings[src];
-        int bl_p = best_local_position.proc_mappings[src];
-        int bg_p = best_global_position.proc_mappings[src];
+        int cu_p = current_position.proc_mappings[src].value();
+        int bl_p = best_local_position.proc_mappings[src].value();
+        int bg_p = best_global_position.proc_mappings[src].value();
         speed.send_sched[i] = w_t * speed.send_sched[i] +
                                  y1 * w_lb * (best_local_position.send_sched[bl_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.send_sched[bg_p].get_relative_rank_by_element(i) - current_position.send_sched[cu_p].get_relative_rank_by_element(i));
@@ -132,9 +132,9 @@ void Particle::update_speed()
     for(size_t i=0;i<speed.rec_sched.size();i++)
     {
         int dst = applications->getChannel(i)->destination;
-        int cu_p = current_position.proc_mappings[dst];
-        int bl_p = best_local_position.proc_mappings[dst];
-        int bg_p = best_global_position.proc_mappings[dst];
+        int cu_p = current_position.proc_mappings[dst].value();
+        int bl_p = best_local_position.proc_mappings[dst].value();
+        int bg_p = best_global_position.proc_mappings[dst].value();
         speed.rec_sched[i] = w_t * speed.rec_sched[i] +
                                  y1 * w_lb * (best_local_position.rec_sched[bl_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i)) +
                                  y2 * w_gb * (best_global_position.rec_sched[bg_p].get_relative_rank_by_element(i) - current_position.rec_sched[cu_p].get_relative_rank_by_element(i));
@@ -147,9 +147,11 @@ void Particle::move()
 {
     for(size_t i=0;i<current_position.proc_mappings.size();i++)
     {
-        current_position.proc_mappings[i] = Schedule::random_round((float) current_position.proc_mappings[i] + speed.proc_mappings[i]);                 
+        int new_mapping = Schedule::random_round((float) current_position.proc_mappings[i].index() + speed.proc_mappings[i]);
+        new_mapping = tools::bring_to_bound(new_mapping, 0, (int)current_position.proc_mappings[i].domain.size()-1);
+        current_position.proc_mappings[i].set_index(new_mapping);                 
     }
-    current_position.proc_mappings = tools::bring_v_to_bound(current_position.proc_mappings, 0, (int)no_processors-1);
+    //current_position.proc_mappings = tools::bring_v_to_bound(current_position.proc_mappings, 0, (int)no_processors-1);
     for(size_t i=0;i<current_position.proc_modes.size();i++)
     {
         current_position.proc_modes[i] = Schedule::random_round((float) current_position.proc_modes[i] + speed.proc_modes[i]);                 

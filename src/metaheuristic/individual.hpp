@@ -192,5 +192,6 @@ protected:
     vector<int> get_next_app(int elem, int app_id,  Schedule &s);
     vector<set<int>> get_comappings(vector<int> mappings);
     vector<int> mapping_based_penalty(vector<int> mappings);
+    void repair_comappings(Position& p);
 };
 

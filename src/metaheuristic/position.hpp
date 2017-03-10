@@ -147,12 +147,14 @@ struct Speed{
  * \brief Stores domain and value of a decision variable.
  */ 
 struct Domain{
-    set<int> domain;
+private:
     int val_indx = 0;
-    int value();
-    int index();
-    void set_domain(set<int>);
+public:    
+    set<int> domain;    
+    int value() const;    
+    int index() const;
     void set_index(int indx);
+    Domain& operator=(const Domain& d);
 };
 /**
  * \struct Position
@@ -167,7 +169,7 @@ public:
     vector<Schedule> proc_sched;
     vector<Schedule> send_sched;
     vector<Schedule> rec_sched;
-    vector<int> proc_mappings;
+    vector<Domain> proc_mappings;
     vector<int> proc_modes;        
     vector<int> tdmaAlloc;     
     vector<int> get_actors_by_proc(int) const;    
@@ -175,6 +177,8 @@ public:
     int penalty;
     vector<float> weights;
     int cnt_violations;
+    vector<int> app_group;/*!< mapping of apps to co-mapping groups.*/
+    vector<int> proc_group;/*!< mapping of co-mapping groups to apps.*/
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
     Position(const Position &obj);
@@ -195,4 +199,5 @@ public:
     vector<int> actors_by_mapping(int proc);
     vector<int> opposite_availabe_procs(int actor, vector<int> new_proc_mappings);
     int select_random(vector<int> v);
+    vector<int> get_proc_mappings() const;
 };
