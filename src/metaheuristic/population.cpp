@@ -49,9 +49,15 @@ Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
 
 void search()
 {
-    out.open(cfg.settings().output_path+"out/out_"+name+".txt");
-    out_csv.open(cfg.settings().output_path+"out/data_"+name+".csv");
-    out_tex.open(cfg.settings().output_path+"out/plot_"+name+".tex");
+    string txt_file = cfg.settings().output_path+"out/out_"+name+".txt";
+    string csv_file = cfg.settings().output_path+"out/data_"+name+".csv";
+    string tex_file = cfg.settings().output_path+"out/plot_"+name+".tex";
+    out.open(txt_file);
+    out_csv.open(csv_file);
+    out_tex.open(tex_file);
+    
+    cout << "output files:\n" << txt_file << endl << csv_file << endl << tex_file << endl;
+    
     
     t_start = runTimer::now();
     auto dur_fitness = runTimer::now() - runTimer::now();
@@ -206,10 +212,11 @@ void evaluate()
             {
                 last_update = current_generation;
                 memory_hist.push_back(long_term_memory);
-                 out << "reinit:" << no_reinits << endl
+                 out << "reinit:" << no_reinits << endl                    
                      << "gen after reinit:" << current_generation - last_reinit << endl
                      << "gen:" << current_generation << endl
                      << "last reinit:" << last_reinit << endl
+                     << "time:" << std::chrono::duration_cast<std::chrono::seconds>(runTimer::now() - t_start).count() << "s\n"
                      << long_term_memory.mem[0] << endl
                      << "total_fitness:" << long_term_memory.mem[0].fitness_func() << endl;   
                  ///#- print the next variables
