@@ -647,7 +647,6 @@ void Individual::repair_comappings(Position& p)
             }
         }
     }
-    
     for(size_t i=0;i<p.proc_group.size();i++)
     {
         domain_sets[p.proc_group[i]].insert(i);
@@ -658,8 +657,8 @@ void Individual::repair_comappings(Position& p)
         int app_id = applications->getSDFGraph(i);
         int group_id = p.app_group[app_id];
         p.proc_mappings[i].domain = domain_sets[group_id];         
-        p.proc_mappings[i].set_index(tools::bring_to_bound(p.proc_mappings[i].index(), 0, (int)p.proc_mappings[i].domain.size()));
-    }    
+        p.proc_mappings[i].set_index(tools::bring_to_bound(p.proc_mappings[i].index(), 0, (int)p.proc_mappings[i].domain.size()-1));
+    }
 }
 void Individual::repair_tdma(Position& p)
 {
@@ -742,7 +741,7 @@ void Individual::calc_fitness()
                           get_next(current_position.send_sched, no_channels),
                           get_next(current_position.rec_sched, no_channels), 
                           current_position.tdmaAlloc);
-            
+        
         int no_mem_violations = 0;
         for(auto m : design.get_slack_memory())
             if(m < 0)
@@ -759,7 +758,7 @@ void Individual::calc_fitness()
                 if(applications->getPeriodConstraint(i) > 0 && prs[i] > applications->getPeriodConstraint(i))    
                 {
                     int delta_period = prs[i] - applications->getPeriodConstraint(i);
-                    current_position.penalty += delta_period;// + mapping_based_penalty(current_position.get_proc_mappings())[i];
+                    current_position.penalty += delta_period + mapping_based_penalty(current_position.get_proc_mappings())[i];
                 }
                 if(prs[i] <= 0)
                     current_position.fitness[i] = INT_MAX;
@@ -810,7 +809,6 @@ void Individual::calc_fitness()
     }
     else
         no_invalid_moves = 0;    
-    
 }
 vector<int> Individual::get_fitness()
 {

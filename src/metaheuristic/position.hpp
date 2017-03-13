@@ -106,7 +106,7 @@ private:
  *
  */
 struct Speed{
-    Speed(int no_actors, int no_channels, int no_processors)
+    Speed(int no_actors, int no_channels, int no_processors, int no_entities)
     {
         //proc_sched = random_v(no_actors, -no_actors/no_processors, no_actors/no_processors);
         //send_sched = random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
@@ -118,6 +118,8 @@ struct Speed{
         proc_mappings = random_v(no_actors, -2, 2);
         proc_modes = random_v(no_actors, -1, 1);
         tdmaAlloc = random_v(no_processors, -1, 1);
+        app_group = random_v(no_entities, -1, 1);
+        proc_group = random_v(no_processors, -1, 1);
     }
     vector<float> proc_sched;
     vector<float> send_sched;
@@ -125,6 +127,8 @@ struct Speed{
     vector<float> proc_mappings;
     vector<float> proc_modes;
     vector<float> tdmaAlloc;
+    vector<float> app_group;
+    vector<float> proc_group;
     static vector<float> random_v(size_t s, float min, float max) 
     {
         random_device rnd_device;

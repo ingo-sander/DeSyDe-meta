@@ -84,13 +84,11 @@ void search()
         dur_fitness += runTimer::now() - start_fitness;
         
         evaluate();
-        
         sort_population();
             
         auto start_update = runTimer::now();
         if(g+1- last_update < no_generations)        
         {
-            LOG_DEBUG("updating positions ");
             /// update the positions
             for (int i = 0; i < no_threads; i++) 
             {

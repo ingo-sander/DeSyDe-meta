@@ -6,7 +6,7 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     Individual(_mapping, _application, _multi_obj, _o_w, _penalty),
                      objective(_objective),
                     best_local_position(_multi_obj, _o_w),
-                    speed(no_actors, no_channels, no_processors),                    
+                    speed(no_actors, no_channels, no_processors, no_entities),                    
                     w_t(_w_t),
                     w_lb(_w_lb),
                     w_gb(_w_gb),
@@ -39,7 +39,7 @@ void Particle::update()
     if(no_invalid_moves > thr_invalid_mov)  
     {
         init_random();
-        Speed s(no_actors, no_channels, no_processors);
+        Speed s(no_actors, no_channels, no_processors, no_entities);
         speed = s;
         best_local_position = current_position;
         best_global_position = current_position;
@@ -51,7 +51,7 @@ void Particle::update()
     /// -# Move the particle based on the speed.
     move();
     /// -# Repair the particle.
-    repair(current_position);       
+    repair(current_position);           
 }
 
 void Particle::update_speed()
@@ -62,7 +62,18 @@ void Particle::update_speed()
         THROW_EXCEPTION(RuntimeException, "update_speed: best_local is empty" );
     float y1 = random_weight();    
     float y2 = random_weight();
-    
+    for(size_t i=0;i<speed.app_group.size();i++)
+    {
+        speed.app_group[i] = w_t * speed.app_group[i] +
+                                 y1 * w_lb * (best_local_position.app_group[i] - current_position.app_group[i]) +
+                                 y2 * w_gb * (best_global_position.app_group[i] - current_position.app_group[i]);      
+    }
+    for(size_t i=0;i<speed.proc_group.size();i++)
+    {
+        speed.proc_group[i] = w_t * speed.proc_group[i] +
+                                 y1 * w_lb * (best_local_position.proc_group[i] - current_position.proc_group[i]) +
+                                 y2 * w_gb * (best_global_position.proc_group[i] - current_position.proc_group[i]);      
+    }
     for(size_t i=0;i<speed.proc_mappings.size();i++)
     {
         speed.proc_mappings[i] = w_t * speed.proc_mappings[i] +
@@ -145,6 +156,17 @@ void Particle::update_speed()
 }
 void Particle::move() 
 {
+    for(size_t i=0;i<current_position.app_group.size();i++)
+    {
+        current_position.app_group[i] = Schedule::random_round((float) current_position.app_group[i] + speed.app_group[i]);        
+    }
+    for(size_t i=0;i<current_position.app_group.size();i++)
+    {
+        current_position.proc_group[i] = Schedule::random_round((float) current_position.proc_group[i] + speed.proc_group[i]);        
+    }
+    
+    ///# repairs mappings and builds the proc domains.
+    repair_comappings(current_position);
     for(size_t i=0;i<current_position.proc_mappings.size();i++)
     {
         int new_mapping = Schedule::random_round((float) current_position.proc_mappings[i].index() + speed.proc_mappings[i]);

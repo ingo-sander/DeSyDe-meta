@@ -161,6 +161,8 @@ int Position::weighted_sum(int a, int b, int c, float w1, float w2)
 }
 std::ostream& operator<< (std::ostream &out, const Position &p)
 {
+    out << "app_group:" << tools::toString(p.app_group) << endl;
+    out << "proc_group:" << tools::toString(p.proc_group) << endl;
     out << "proc_mappings:" << tools::toString(p.get_proc_mappings());
     out << endl << "proc_modes:" << tools::toString(p.proc_modes);    
     out << endl << "tdmaAlloc:" << tools::toString(p.tdmaAlloc);    
