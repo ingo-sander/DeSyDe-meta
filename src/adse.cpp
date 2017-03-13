@@ -46,6 +46,9 @@
 #include "cp_model/schedulability.hpp"
 #include "validation/validation.hpp"
 
+#include "metaheuristic/swarm.hpp"
+#include "metaheuristic/ga_population.hpp"
+
 #include "xml/xmldoc.hpp"
 #include "settings/config.hpp"
 #include "exceptions/exception.h"
@@ -140,14 +143,81 @@ int main(int argc, const char* argv[]) {
     Mapping* map = new Mapping(appset, platform, xml_wcet);
     
     LOG_INFO("Sorting pr tasks based on utilization ... ");
-    map->PrintWCETs();
+    //map->PrintWCETs();
     map->SortTasksUtilization();
     cout << *taskset;
+
+    
+//Testing the design class --------------------------------------------
+/*
+    shared_ptr<Mapping> map_ptr(new Mapping(appset, platform, xml_wcet));
+    shared_ptr<Applications> appset_ptr(new Applications(sdfs, taskset, xml_const));
+
+    vector<int> proc_mappings = {3, 3, 3, 0, 1, 1, 2, 0, 0, 2, 3, 3, 0, 0, 0, 0};
+    vector<int> proc_modes{1, 0, 0, 1};
+    vector<int> next = {10, 2, 19, 16, 5, 17, 9, 12, 13, 18, 11, 1, 8, 14, 15, 3, 4, 6, 0, 7};
+    vector<int> sendNext = {12, 2, 3, 20, 18, 4, 9, 14, 10, 8, 19, 0, 1, 15, 13, 16, 17, 5, 6, 11, 7};
+    vector<int> recNext = {1, 20, 3, 17, 18, 19, 12, 9, 11, 14, 16, 0, 7, 15, 13, 10, 2, 4, 5, 8, 6};
+    vector<int> tdmaAlloc = {1,1,1,1};
+    Design* design = new Design(map_ptr, appset_ptr, proc_mappings, proc_modes, 
+                                next, sendNext, recNext, tdmaAlloc);
+    vector<int> periods = design->get_periods();
+    for(auto p:periods)
+        cout << "period=" << p << ", ";
+    cout << endl << "energy=" << design->get_energy() << endl
+        << *design << endl;    
+     
+    proc_mappings = {};
+    //next = {}; 
+    sendNext = {}; 
+    recNext = {}; 
+    //tdmaAlloc = {}; 
+    
+    SDFPROnlineModel* cp_model;
+    LOG_INFO("Creating a constraint model object ... ");
+    cp_model = new SDFPROnlineModel(map, &cfg);
+    cp_model->set_design(proc_mappings, proc_modes, tdmaAlloc, next, sendNext, recNext);
+    
+    LOG_INFO("Creating an execution object ... ");
+    Execution<SDFPROnlineModel> cp_execObj(cp_model, cfg);
+
+    LOG_INFO("Running the model object ... ");
+    cp_execObj.Execute();
+    
+    LOG_INFO("End of testing design class ... ");
+    
+    return exit_status;
+*/   
+    if(cfg.settings().search == Config::GA)
+    {
+       
+        shared_ptr<Mapping> map_ptr(new Mapping(appset, platform, xml_wcet));
+        shared_ptr<Applications> appset_ptr(new Applications(sdfs, taskset, xml_const));
+
+        
+        GA_Population p(map_ptr, appset_ptr, cfg);
+        p.search();
+        return exit_status;    
+ 
+    }
+    if(cfg.settings().search == Config::PSO)
+    {
+       
+        shared_ptr<Mapping> map_ptr(new Mapping(appset, platform, xml_wcet));
+        shared_ptr<Applications> appset_ptr(new Applications(sdfs, taskset, xml_const));
+
+        
+        Swarm s(map_ptr, appset_ptr, cfg);
+        s.search();
+        return exit_status;    
+    }
+
 
     SDFPROnlineModel* model;
     //PRESOLVING +++
 
-    if(sdfs.size() > 0){
+    if(sdfs.size() > 0)
+    {
     LOG_INFO("Creating PRESOLVING constraint model object ... ");
     //OneProcModel* pre_model = new OneProcModel(map, cfg);
 
@@ -160,7 +230,8 @@ int main(int argc, const char* argv[]) {
         vector<vector<tuple<int,int>>> mappings = presolver.getMappingResults();
         cout << "Presolver found " << mappings.size() << " isolated mappings." << endl;
     }
-    else{
+    else
+    {
         LOG_INFO("Creating a constraint model object ... ");
         model = new SDFPROnlineModel(map, &cfg);
     }
@@ -180,4 +251,12 @@ int main(int argc, const char* argv[]) {
   }
 
 }
-
+/*
+ * Example in which the critical cycle is detected while mcr is incorrect
+    vector<int> proc_mappings = {1, 2, 0, 1, 3, 3, 3, 1, 1, 0, 3, 2, 2, 2, 1, 2};
+    vector<int> proc_modes{1,0,1,1};
+    vector<int> next = {8, 12, 16, 7, 5, 6, 19, 17, 14, 2, 4, 1, 13, 15, 3, 18, 0, 11, 10, 9};
+    vector<int> sendNext = {1,16,14,17,5,6,20,18,9,10,3,4,2,15,13,19,7,0,12,11,8};
+    vector<int> recNext = {14,17,13,15,5,20,7,2,4,10,19,0,11,3,16,18,9,6,12,8,1};
+    vector<int> tdmaAlloc = {1,1,1,1};
+*/
