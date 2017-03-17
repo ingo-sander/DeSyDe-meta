@@ -65,6 +65,7 @@ public:
     void switch_ranks(int, int);    
     vector<int> get_elements();
     int get_element_by_rank(int) const;
+    int get_index_by_element(int) const;
     int get_rank_by_id(int) const;
     int get_rank_by_element(int) const;
     float get_relative_rank_by_element(int) const;

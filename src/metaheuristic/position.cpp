@@ -93,11 +93,11 @@ bool Position::dominate(Position& p_in) const
 {
     if(empty())
         return false;
-    /** -# fitness can not be negative. */            
+    /** -# fitness can not be negative.             
     if(invalid())
-        return false;      
+        return false;*/      
         
-    if(p_in.empty() || p_in.invalid())
+    if(p_in.empty())// || p_in.invalid())
         return true;
     /*
     if(cnt_violations < p_in.cnt_violations)
@@ -108,11 +108,15 @@ bool Position::dominate(Position& p_in) const
     if(multi_obj)
     {
         if(penalty > p_in.penalty)
+        {
             return false;
+        }
         for(size_t i=0;i<fitness.size();i++)
         {
-            if(fitness[i] > p_in.fitness[i])
+            if(weights[i] > 0 && fitness[i] > p_in.fitness[i] )
+            {
                 return false;
+            }
         }
         return true;
     }
@@ -225,6 +229,20 @@ int Schedule::get_rank_by_element(int elem) const
     {
         if(elements[i] == elem)
             return rank[i];
+    }
+    THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
+           
+    return -1;
+}
+int Schedule::get_index_by_element(int elem) const
+{
+    if(elements.empty())
+        THROW_EXCEPTION(RuntimeException, "elements vector is empty ");
+        
+    for(size_t i=0;i<rank.size();i++)
+    {
+        if(elements[i] == elem)
+            return i;
     }
     THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
            
