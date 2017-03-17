@@ -74,7 +74,6 @@ void search()
         }
         if(par_f.empty() && long_term_memory.empty())
             init();
-             
         auto start_fitness = runTimer::now();
         for (int i = 0; i < no_threads; i++) 
         {
@@ -86,12 +85,10 @@ void search()
         {
              t[i].join();
         }
-        
         dur_fitness += runTimer::now() - start_fitness;
         
         evaluate();
         sort_population();
-            
         auto start_update = runTimer::now();
         if(g+1- last_update < no_generations)        
         {
@@ -117,9 +114,9 @@ void search()
     auto dur_update_s = std::chrono::duration_cast<std::chrono::milliseconds>(dur_update).count();
     auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(durAll).count();
     std::stringstream stat;
-    stat    << "===== search ended after: " << durAll_s/3600 << " h " 
-            << (durAll_s%3600)/60 << " m "
-            << (durAll_s%60) << " s "
+    stat    << "===== search ended after: " << durAll_s/3600 << "h " 
+            << (durAll_s%3600)/60 << "m "
+            << (durAll_s%60) << "s "
             << "(" << durAll_ms 
             << " ms)\nfitness=" << dur_fitness_s << "ms update=" << dur_update_s << "ms \n"
             << "no threads=" << no_threads 
@@ -204,7 +201,7 @@ void evaluate()
                 last_update = current_generation;
                 last_short_term_update = current_generation;
                 last_update_time = runTimer::now() - t_start;
-                if(par_f.pareto.size() % 50 == 0)
+                if(par_f.pareto.size() % 100 == 0)
                     cout << "pareto size:" << par_f.pareto.size() << endl;
             }
         }
@@ -228,6 +225,7 @@ void evaluate()
                      << "last reinit:" << last_reinit << endl
                      << "time:" << std::chrono::duration_cast<std::chrono::seconds>(runTimer::now() - t_start).count() << "s\n"
                      << long_term_memory.mem[0] << endl
+                     << "penalty:" << long_term_memory.mem[0].penalty << endl
                      << "total_fitness:" << long_term_memory.mem[0].fitness_func() << endl;   
                  ///#- print the next variables
                  out << "proc_sched:" << tools::toString(population[p]->get_next(long_term_memory.mem[0].proc_sched, applications->n_SDFActors())) << endl;
@@ -274,7 +272,7 @@ void print()
    
    for(auto p : par_f.pareto)
    {
-       if(p.cnt_violations == 0)
+       if(p.cnt_violations == 0 && p.penalty == 0)
        {
            vector<int> tmp;
            tmp.push_back(p.fitness_func());
@@ -286,7 +284,7 @@ void print()
        for(auto p : m.mem)
        {
            vector<int> tmp;
-           if(p.cnt_violations == 0)
+           if(p.cnt_violations == 0 && p.penalty == 0)
            {
                tmp.push_back(p.fitness_func());
                tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
