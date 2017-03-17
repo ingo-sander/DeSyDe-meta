@@ -84,9 +84,19 @@ bool Individual::is_dep_send_sched_violation(Position &p, int proc, int a, int i
             int rank_src_b = p.proc_sched[p.proc_mappings[src_b].value()].get_rank_by_element(src_b);       
             
             if(rank_src_a < rank_src_b && rank_a > rank_b)
-                return true;
+                {
+                    /*cout << "case 1a: actor " << src_a << " is scheduled before actor " << src_b 
+                     << " while channel " << a << " is scheduled after " << b << endl;*/
+                    //cout << "1"; 
+                    return true;
+                }
             if(rank_src_a > rank_src_b && rank_a < rank_b)
-                return true;    
+                {
+                    /*cout << "case 1b: actor " << src_b << " is scheduled before actor " << src_a 
+                     << " while channel " << b << " is scheduled after " << a << endl;*/
+                    //cout << "1"; 
+                    return true;
+                }
         }
         /**
          * if a and b have same destination proccessor
@@ -95,13 +105,59 @@ bool Individual::is_dep_send_sched_violation(Position &p, int proc, int a, int i
          */ 
         if(p.proc_mappings[dst_a].value() == p.proc_mappings[dst_b].value())
         {
-            int rank_dst_a = p.rec_sched[p.proc_mappings[dst_a].value()].get_rank_by_element(a);
-            int rank_dst_b = p.rec_sched[p.proc_mappings[dst_b].value()].get_rank_by_element(b);       
-            int rank_a = p.send_sched[proc].get_rank_by_id(i);
-            int rank_b = p.send_sched[proc].get_rank_by_id(j);            
-            if((rank_dst_a < rank_dst_b && rank_a > rank_b)
-            || (rank_dst_a > rank_dst_b && rank_a < rank_b))
+            int rank_dst_a = p.proc_sched[p.proc_mappings[dst_a].value()].get_rank_by_element(dst_a);
+            int rank_dst_b = p.proc_sched[p.proc_mappings[dst_b].value()].get_rank_by_element(dst_b);       
+            if((rank_dst_a < rank_dst_b && rank_a > rank_b))
+            //|| (rank_dst_a > rank_dst_b && rank_a < rank_b))
             {
+                /*
+                cout << "case 2a: actor " << dst_a << " [" << rank_dst_a << "]is scheduled before actor " << dst_b << " [" << rank_dst_b
+                     << "] while channel " << a << " is scheduled after " << b << endl;*/
+                //cout << "2";     
+                //return true;
+            }
+             if((rank_dst_a > rank_dst_b && rank_a < rank_b))
+            {
+                /*cout << "case 2b: actor " << dst_b << " is scheduled before actor " << dst_a 
+                     << " while channel " << b << " is scheduled after " << a << endl;*/
+                //cout << "2";     
+                //return true;
+            }
+        }         
+    }
+    
+    return false;
+}
+bool Individual::is_dep_proc_rec_sched_violation(Position &p, int proc, int a, int i, int b, int j)
+{
+    if(a < (int) no_channels && b < (int) no_channels)
+    {
+        int dst_b = applications->getChannel(b)->destination;
+        int dst_a = applications->getChannel(a)->destination;
+        int rank_a = p.send_sched[proc].get_rank_by_id(i);
+        int rank_b = p.send_sched[proc].get_rank_by_id(j);
+        /**
+         * if a and b have same destination proccessor
+         * and a is received first while we first send b
+         * or vice versa
+         */ 
+        if(p.proc_mappings[dst_a].value() == p.proc_mappings[dst_b].value())
+        {
+            int rank_dst_a = p.proc_sched[p.proc_mappings[dst_a].value()].get_rank_by_element(dst_a);
+            int rank_dst_b = p.proc_sched[p.proc_mappings[dst_b].value()].get_rank_by_element(dst_b);       
+            if((rank_dst_a < rank_dst_b && rank_a > rank_b))
+            {
+                /*
+                cout << "case 2a: actor " << dst_a << " [" << rank_dst_a << "]is scheduled before actor " << dst_b << " [" << rank_dst_b
+                     << "] while channel " << a << " is scheduled after " << b << endl;*/
+                //cout << "2";     
+                return true;
+            }
+             if((rank_dst_a > rank_dst_b && rank_a < rank_b))
+            {
+                /*cout << "case 2b: actor " << dst_b << " is scheduled before actor " << dst_a 
+                     << " while channel " << b << " is scheduled after " << a << endl;*/
+                //cout << "2";     
                 return true;
             }
         }         
@@ -183,7 +239,30 @@ int Individual::count_send_sched_violations(Position& p)
     }
     return cnt;
 }
-
+int Individual::count_proc_rec_sched_violations(Position& p)
+{
+    /**
+     * if the source of a and b are on the same proc
+     * and rank_src_a < rank_src_b and rank_a > rank_b then switch
+     */ 
+    int cnt = 0;
+    for(size_t proc=0;proc<p.send_sched.size();proc++)
+    {
+        for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
+        {
+            int a = p.send_sched[proc].get_elements()[i];
+            for(size_t j=0;j<p.send_sched[proc].get_elements().size();j++)
+            {                
+                int b = p.send_sched[proc].get_elements()[j];
+                if(is_dep_proc_rec_sched_violation(p, proc, a, i, b, j))
+                {
+                    cnt++;                    
+                }
+            }
+        }
+    }
+    return cnt;
+}
 int Individual::count_rec_sched_violations(Position& p)
 {
     int cnt = 0;
@@ -216,9 +295,15 @@ int Individual::count_sched_violations(Position& p)
         cnt++;
     }
     */
+    int sched_vio = count_proc_sched_violations(p);
+    int send_vio = count_send_sched_violations(p);
+    int rec_vio = count_proc_sched_violations(p);
+    int proc_rec_vio = count_proc_rec_sched_violations(p);
     
-    cnt += count_proc_sched_violations(p)
-        + count_send_sched_violations(p) + count_rec_sched_violations(p);
+    
+    //cout << "----------\n" << "sched:" << sched_vio << " send:" << send_vio << " rec:" << rec_vio << " proc_rec:" << proc_rec_vio << endl;
+    
+    cnt = sched_vio + send_vio + rec_vio + proc_rec_vio;
     
     p.cnt_violations = cnt;       
     
@@ -429,7 +514,10 @@ void Individual::repair(Position &p)
     repair_sched(p);
     //repair_cross_deadlock(p);  
     repair_send_sched(p);
+    repair_proc_rec_sched(p);
+    repair_send_sched(p);
     repair_rec_sched(p);     
+    
 }
 void Individual::repair_cross_deadlock(Position& p)
 {
@@ -457,7 +545,7 @@ void Individual::repair_sched(Position& p)
                 if(is_dep_sched_violation(p, proc, a, i, b, j))
                 {
                     //if(random::random_bool())
-                        p.proc_sched[proc].switch_ranks(i, j);
+                        p.proc_sched[proc].switch_ranks(i, j);                        
                 }
             }
         }
@@ -466,9 +554,12 @@ void Individual::repair_sched(Position& p)
 }
 void Individual::repair_send_sched(Position& p)
 {
+    //cout << "---------------------------------------\n";
     for(size_t proc=0;proc<p.send_sched.size();proc++)
     {
         p.send_sched[proc].set_rank( tools::bring_v_to_bound(p.send_sched[proc].get_rank(), 0, (int)p.send_sched[proc].get_rank().size()-1) );
+        //cout << tools::toString(p.send_sched[proc].get_elements()) << endl;
+        //cout << tools::toString(p.send_sched[proc].get_rank()) << endl ;
         for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
         {
             int a = p.send_sched[proc].get_elements()[i];
@@ -478,10 +569,52 @@ void Individual::repair_send_sched(Position& p)
                 if(is_dep_send_sched_violation(p, proc, a, i, b, j))                
                 {
                     //if(random::random_bool())
-                        p.send_sched[proc].switch_ranks(i, j);                        
+                        p.send_sched[proc].switch_ranks(i, j);
+                        /*cout << "switching " << a << " and " << b 
+                        << " [" << p.send_sched[proc].get_rank()[j] << " <->" << p.send_sched[proc].get_rank()[i]
+                        << endl;*/
                 }                
             }
+        
         }
+        //cout << tools::toString(p.send_sched[proc].get_elements()) << endl;
+        //cout << tools::toString(p.send_sched[proc].get_rank()) << endl << endl;
+    }
+    
+}
+void Individual::repair_proc_rec_sched(Position& p)
+{
+    //cout << "---------------------------------------\n";
+    for(size_t proc=0;proc<p.send_sched.size();proc++)
+    {
+        //cout << tools::toString(p.send_sched[proc].get_elements()) << endl;
+        //cout << tools::toString(p.send_sched[proc].get_rank()) << endl ;
+        for(size_t i=0;i<p.send_sched[proc].get_elements().size();i++)
+        {
+            int a = p.send_sched[proc].get_elements()[i];
+            for(size_t j=0;j<p.send_sched[proc].get_elements().size();j++)
+            {                
+                int b = p.send_sched[proc].get_elements()[j];
+                if(is_dep_proc_rec_sched_violation(p, proc, a, i, b, j))                
+                {
+                    int dst_b = applications->getChannel(b)->destination;
+                    int dst_a = applications->getChannel(a)->destination;
+                    int indx_dst_a = p.proc_sched[p.proc_mappings[dst_a].value()].get_index_by_element(dst_a);
+                    int indx_dst_b = p.proc_sched[p.proc_mappings[dst_b].value()].get_index_by_element(dst_b);       
+                    
+                    if(!is_dep_sched_violation(p, p.proc_mappings[dst_a].value(), dst_a, indx_dst_a, dst_b, indx_dst_b))
+                        p.proc_sched[p.proc_mappings[dst_a].value()].switch_ranks(indx_dst_a, indx_dst_b);
+        
+                    //if(random::random_bool())
+                        /*cout << "switching " << a << " and " << b 
+                        << " [" << p.send_sched[proc].get_rank()[j] << " <->" << p.send_sched[proc].get_rank()[i]
+                        << endl;*/
+                }                
+            }
+        
+        }
+        //cout << tools::toString(p.send_sched[proc].get_elements()) << endl;
+        //cout << tools::toString(p.send_sched[proc].get_rank()) << endl << endl;
     }
     
 }
@@ -758,7 +891,7 @@ void Individual::calc_fitness()
                 if(applications->getPeriodConstraint(i) > 0 && prs[i] > applications->getPeriodConstraint(i))    
                 {
                     int delta_period = prs[i] - applications->getPeriodConstraint(i);
-                    current_position.penalty += delta_period + mapping_based_penalty(current_position.get_proc_mappings())[i];
+                    current_position.penalty += delta_period + prs[i];//mapping_based_penalty(current_position.get_proc_mappings())[i];
                 }
                 if(prs[i] <= 0)
                     current_position.fitness[i] = INT_MAX;

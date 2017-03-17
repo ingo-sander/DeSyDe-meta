@@ -192,6 +192,9 @@ protected:
     vector<int> get_next_app(int elem, int app_id,  Schedule &s);
     vector<set<int>> get_comappings(vector<int> mappings);
     vector<int> mapping_based_penalty(vector<int> mappings);
+    void repair_proc_rec_sched(Position& p);
+    bool is_dep_proc_rec_sched_violation(Position &p, int proc, int a, int i, int b, int j);
+    int count_proc_rec_sched_violations(Position& p);
     void repair_comappings(Position& p);
 };
 
