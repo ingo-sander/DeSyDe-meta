@@ -99,18 +99,19 @@ bool Position::dominate(Position& p_in) const
         
     if(p_in.empty())// || p_in.invalid())
         return true;
-    /*
-    if(cnt_violations < p_in.cnt_violations)
-        return true;
+    
     if(cnt_violations > p_in.cnt_violations)
-        return false;              
-    */    
+            return false;              
+    else if(cnt_violations < p_in.cnt_violations)
+        return true;
+    if(penalty > p_in.penalty)
+        return false;
+    else if(penalty < p_in.penalty)
+        return true;
+    
     if(multi_obj)
     {
-        if(penalty > p_in.penalty)
-        {
-            return false;
-        }
+        
         for(size_t i=0;i<fitness.size();i++)
         {
             if(weights[i] > 0 && fitness[i] > p_in.fitness[i] )
