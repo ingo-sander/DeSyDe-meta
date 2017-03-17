@@ -10,6 +10,7 @@ std::ostream& operator<< (std::ostream &out, const ParetoFront &p)
 {
     for(auto po : p.pareto)
         out << tools::toString(po.fitness_func()) << " " 
+            << tools::toString(po.penalty) << " " 
             << tools::toString(po.fitness) 
             << endl;
     return out;    
@@ -77,7 +78,7 @@ bool ParetoFront::update_pareto(Position p)
     {
         int indx = remove_indx[i];            
         pareto.erase (pareto.begin()+indx);           
-     }
+    }
     return is_updated;
 }
 void Memory::set_mem_size(int s)
