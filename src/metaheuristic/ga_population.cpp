@@ -9,7 +9,7 @@ GA_Population::GA_Population(shared_ptr<Mapping> _mapping, shared_ptr<Applicatio
     int thresh = sqrt(no_individulas)+1;
     for(int i=0;i<thresh;i++)
     {
-        for(int j=0;j<thresh;j++)
+        for(int j=i+1;j<thresh;j++)
         {
             pair<int,int> par (i,j);
             //if(i != j)
@@ -47,21 +47,25 @@ std::ostream& operator<< (std::ostream &out, const GA_Population &pop)
 
 void GA_Population::update(int t_id)
 {
-    int start_id = t_id * individual_per_thread;
-    int end_id = start_id + individual_per_thread;
+    int start_id = t_id * individual_per_thread/2;
+    int end_id = start_id + individual_per_thread/2;
     if(t_id == no_threads -1)///Last thread takes care of all remaining particles
-        end_id = no_individulas;
-    for(int i=start_id;i<end_id;i++)    
+        end_id = no_individulas/2-1;
+    for(int i=start_id;i<end_id;i+=2)    
     {
         /// Copy parent one because it will be updated
-        shared_ptr<Chromosome> parent1(new Chromosome(*population[parents[i].first]));
+        shared_ptr<Chromosome> child1(new Chromosome(*population[parents[i].first]));
         
-        shared_ptr<Chromosome> parent2 = population[parents[i].second];
+        shared_ptr<Chromosome> child2(new Chromosome(*population[parents[i].second]));
         
-        parent1->set_best_global(parent2->get_current_position());
-        parent1->update();
+        child1->set_best_global(population[parents[i].second]->get_current_position());
+        child1->update();
         
-        next_population[i] = parent1;        
+        child2->set_best_global(population[parents[i].first]->get_current_position());
+        child2->update();
+        
+        next_population[i] = child1;        
+        next_population[i+1] = child2;
     }
     
 }
@@ -89,7 +93,7 @@ void GA_Population::print_results()
 }
 void GA_Population::select_fittest()
 {
-    population.insert(population.end(), old_population.begin(), old_population.end());
+    population.insert(population.end(), next_population.begin(), next_population.end());
     std::sort(population.begin(), population.end(),
                     [](shared_ptr<Chromosome> const a, shared_ptr<Chromosome> const b) -> bool 
                     { return a->dominate(b); } );
@@ -112,7 +116,7 @@ void GA_Population::sort_population()
     for(size_t i=0;i<possible_parents.size();i++)
         all_indices.push_back(i);
     vector<int> slected_indices;
-    for(size_t i=0;i<no_individulas;i++)
+    for(size_t i=0;i<no_individulas/2;i++)
     {
         int rand = random::random_indx(all_indices.size()-1);        
         int indx = all_indices[rand];

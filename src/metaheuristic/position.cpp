@@ -24,7 +24,9 @@ Position::Position(const Position &obj)
     fitness = obj.fitness;   
     penalty = obj.penalty;
     weights = obj.weights;   
-    cnt_violations = obj.cnt_violations;           
+    cnt_violations = obj.cnt_violations;     
+    app_group = obj.app_group;
+    proc_group = obj.proc_group;      
 }
 void Position::print_multi_obj()
 {
@@ -70,6 +72,8 @@ Position& Position::operator=(const Position& p)
     weights = p.weights;
     multi_obj = p.multi_obj;
     cnt_violations = p.cnt_violations;   
+    app_group = p.app_group;
+    proc_group = p.proc_group;
     proc_sched.clear();
     send_sched.clear();
     rec_sched.clear();
@@ -89,11 +93,11 @@ bool Position::dominate(Position& p_in) const
 {
     if(empty())
         return false;
-    /** -# fitness can not be negative. */            
+    /** -# fitness can not be negative.             
     if(invalid())
-        return false;      
+        return false;*/      
         
-    if(p_in.empty() || p_in.invalid())
+    if(p_in.empty())// || p_in.invalid())
         return true;
     /*
     if(cnt_violations < p_in.cnt_violations)
@@ -104,11 +108,15 @@ bool Position::dominate(Position& p_in) const
     if(multi_obj)
     {
         if(penalty > p_in.penalty)
+        {
             return false;
+        }
         for(size_t i=0;i<fitness.size();i++)
         {
-            if(fitness[i] > p_in.fitness[i])
+            if(weights[i] > 0 && fitness[i] > p_in.fitness[i] )
+            {
                 return false;
+            }
         }
         return true;
     }
@@ -157,7 +165,9 @@ int Position::weighted_sum(int a, int b, int c, float w1, float w2)
 }
 std::ostream& operator<< (std::ostream &out, const Position &p)
 {
-    out << "proc_mappings:" << tools::toString(p.proc_mappings);
+    out << "app_group:" << tools::toString(p.app_group) << endl;
+    out << "proc_group:" << tools::toString(p.proc_group) << endl;
+    out << "proc_mappings:" << tools::toString(p.get_proc_mappings());
     out << endl << "proc_modes:" << tools::toString(p.proc_modes);    
     out << endl << "tdmaAlloc:" << tools::toString(p.tdmaAlloc);    
     
@@ -219,6 +229,20 @@ int Schedule::get_rank_by_element(int elem) const
     {
         if(elements[i] == elem)
             return rank[i];
+    }
+    THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
+           
+    return -1;
+}
+int Schedule::get_index_by_element(int elem) const
+{
+    if(elements.empty())
+        THROW_EXCEPTION(RuntimeException, "elements vector is empty ");
+        
+    for(size_t i=0;i<rank.size();i++)
+    {
+        if(elements[i] == elem)
+            return i;
     }
     THROW_EXCEPTION(RuntimeException, "element " + tools::toString(elem) + " is not in the set");
            
@@ -370,7 +394,7 @@ std::ostream& operator<< (std::ostream &out, const Schedule &sched)
 }
 void Position::opposite()
 {
-    vector<int> new_proc_mappings = proc_mappings;
+    /*vector<int> new_proc_mappings = proc_mappings.value();
     for(size_t i=0;i<proc_mappings.size();i++)
     {
         vector<int> available = opposite_availabe_procs(i, new_proc_mappings);
@@ -386,13 +410,14 @@ void Position::opposite()
             new_proc_mappings[i] = select_random(available);                
     }
     proc_mappings = new_proc_mappings;
+    */ 
 }
 vector<int> Position::actors_by_mapping(int proc)
 {
     vector<int> actors;
     for(size_t i=0;i<proc_mappings.size();i++)
     {
-        if(proc_mappings[i] == proc)
+        if(proc_mappings[i].value() == proc)
         {
             actors.push_back(i);
         }
@@ -404,7 +429,7 @@ vector<int> Position::get_actors_by_proc(int proc_id) const
     vector<int> actors;
     for(size_t i=0;i<proc_mappings.size();i++)
     {
-        if(proc_mappings[i] == proc_id)
+        if(proc_mappings[i].value() == proc_id)
             actors.push_back(i);
     }
     return actors;
@@ -412,7 +437,7 @@ vector<int> Position::get_actors_by_proc(int proc_id) const
 vector<int> Position::opposite_availabe_procs(int actor, vector<int> new_proc_mappings)
 {
     vector<int> availabe_procs;
-    vector<int> co_located_actors = actors_by_mapping(proc_mappings[actor]);
+    vector<int> co_located_actors = actors_by_mapping(proc_mappings[actor].value());
     for(size_t i=0;i<proc_modes.size();i++)
     {
         bool proc_used = false;
@@ -437,7 +462,15 @@ int Position::select_random(vector<int> v)
     auto gen = std::bind(dist, mersenne_engine);
     return v[gen()];    
 }
-
+vector<int> Position::get_proc_mappings() const
+{
+    vector<int> mappings;
+    for(auto m : proc_mappings)
+    {
+        mappings.push_back(m.value());
+    }
+    return mappings;
+}
 float Speed::average() const
 {
     return tools::average(proc_mappings)+tools::average(proc_sched);
@@ -448,23 +481,26 @@ void Speed::apply_bounds()
     float no_processors = (float)proc_modes.size();
     proc_mappings = tools::bring_v_to_bound(proc_mappings, -no_processors/ratio, no_processors/ratio);
 }
-int Domain::value()
+int Domain::value() const
 {
     set<int>::iterator it = domain.begin();
     std::advance(it, val_indx);
     return *(it);
 }
-int Domain::index()
+int Domain::index() const
 {
     return val_indx;
 }
-void Domain::set_domain(set<int> d)
-{
-    domain = d;
-}
+
 void Domain::set_index(int indx)
 {
-    if(indx > domain.size())
+    if(indx > (int) domain.size())
         THROW_EXCEPTION(RuntimeException, "domain index is larger than domain size" );
     val_indx = indx;
+}
+Domain& Domain::operator=(const Domain& d)
+{
+    val_indx = d.val_indx;
+    domain = d.domain;
+    return *this;
 }

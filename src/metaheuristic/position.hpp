@@ -65,6 +65,7 @@ public:
     void switch_ranks(int, int);    
     vector<int> get_elements();
     int get_element_by_rank(int) const;
+    int get_index_by_element(int) const;
     int get_rank_by_id(int) const;
     int get_rank_by_element(int) const;
     float get_relative_rank_by_element(int) const;
@@ -106,7 +107,7 @@ private:
  *
  */
 struct Speed{
-    Speed(int no_actors, int no_channels, int no_processors)
+    Speed(int no_actors, int no_channels, int no_processors, int no_entities)
     {
         //proc_sched = random_v(no_actors, -no_actors/no_processors, no_actors/no_processors);
         //send_sched = random_v(no_channels, -no_channels/no_processors, no_channels/no_processors);
@@ -118,6 +119,8 @@ struct Speed{
         proc_mappings = random_v(no_actors, -2, 2);
         proc_modes = random_v(no_actors, -1, 1);
         tdmaAlloc = random_v(no_processors, -1, 1);
+        app_group = random_v(no_entities, -1, 1);
+        proc_group = random_v(no_processors, -1, 1);
     }
     vector<float> proc_sched;
     vector<float> send_sched;
@@ -125,6 +128,8 @@ struct Speed{
     vector<float> proc_mappings;
     vector<float> proc_modes;
     vector<float> tdmaAlloc;
+    vector<float> app_group;
+    vector<float> proc_group;
     static vector<float> random_v(size_t s, float min, float max) 
     {
         random_device rnd_device;
@@ -147,12 +152,14 @@ struct Speed{
  * \brief Stores domain and value of a decision variable.
  */ 
 struct Domain{
-    set<int> domain;
+private:
     int val_indx = 0;
-    int value();
-    int index();
-    void set_domain(set<int>);
+public:    
+    set<int> domain;    
+    int value() const;    
+    int index() const;
     void set_index(int indx);
+    Domain& operator=(const Domain& d);
 };
 /**
  * \struct Position
@@ -167,7 +174,7 @@ public:
     vector<Schedule> proc_sched;
     vector<Schedule> send_sched;
     vector<Schedule> rec_sched;
-    vector<int> proc_mappings;
+    vector<Domain> proc_mappings;
     vector<int> proc_modes;        
     vector<int> tdmaAlloc;     
     vector<int> get_actors_by_proc(int) const;    
@@ -175,6 +182,8 @@ public:
     int penalty;
     vector<float> weights;
     int cnt_violations;
+    vector<int> app_group;/*!< mapping of apps to co-mapping groups.*/
+    vector<int> proc_group;/*!< mapping of co-mapping groups to apps.*/
     friend std::ostream& operator<< (std::ostream &out, const Position &p);
     
     Position(const Position &obj);
@@ -195,4 +204,5 @@ public:
     vector<int> actors_by_mapping(int proc);
     vector<int> opposite_availabe_procs(int actor, vector<int> new_proc_mappings);
     int select_random(vector<int> v);
+    vector<int> get_proc_mappings() const;
 };

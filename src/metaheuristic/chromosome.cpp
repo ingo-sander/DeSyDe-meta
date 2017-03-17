@@ -22,16 +22,16 @@ void Chromosome::crossover()
     build_schedules(new_pos);      
     
     new_pos.proc_sched = crossover(new_pos.proc_sched, 
-                                    current_position.proc_sched, current_position.proc_mappings,
-                                    best_global_position.proc_sched, best_global_position.proc_mappings, no_actors);
+                                    current_position.proc_sched, current_position.get_proc_mappings(),
+                                    best_global_position.proc_sched, best_global_position.get_proc_mappings(), no_actors);
 
     vector<int> curr_src_mappings(no_channels, 0);
     vector<int> bg_src_mappings(no_channels, 0);
     for(size_t i=0;i<no_channels;i++)
     {
         int src = applications->getChannel(i)->source;
-        curr_src_mappings[i] = current_position.proc_mappings[src];
-        bg_src_mappings[i] = best_global_position.proc_mappings[src];
+        curr_src_mappings[i] = current_position.proc_mappings[src].value();
+        bg_src_mappings[i] = best_global_position.proc_mappings[src].value();
     }
          
     new_pos.send_sched = crossover(new_pos.send_sched, 
@@ -43,8 +43,8 @@ void Chromosome::crossover()
     for(size_t i=0;i<no_channels;i++)
     {
         int dst = applications->getChannel(i)->destination;
-        curr_dst_mappings[i] = current_position.proc_mappings[dst];
-        bg_dst_mappings[i] = best_global_position.proc_mappings[dst];
+        curr_dst_mappings[i] = current_position.proc_mappings[dst].value();
+        bg_dst_mappings[i] = best_global_position.proc_mappings[dst].value();
     }
     new_pos.rec_sched = crossover(new_pos.rec_sched, 
                                         current_position.rec_sched, curr_dst_mappings,
@@ -60,6 +60,15 @@ void Chromosome::cross_mut()
     if(best_global_position.empty())
         THROW_EXCEPTION(RuntimeException, "best_global_position is empty!" );     
     Position new_pos(current_position.multi_obj, current_position.weights);
+    
+    new_pos.app_group = crossover(current_position.app_group, 
+                    best_global_position.app_group);
+    new_pos.app_group = mutation(new_pos.app_group);                
+    
+    new_pos.proc_group = crossover(current_position.proc_group, 
+                    best_global_position.proc_group);       
+    new_pos.proc_group = mutation(new_pos.proc_group);                         
+    
     ///#- mappings
     new_pos.proc_mappings = crossover(current_position.proc_mappings, 
                     best_global_position.proc_mappings);
@@ -77,16 +86,16 @@ void Chromosome::cross_mut()
     build_schedules(new_pos);      
     ///#- proc schedules
     new_pos.proc_sched = crossover(new_pos.proc_sched, 
-                                    current_position.proc_sched, current_position.proc_mappings,
-                                    best_global_position.proc_sched, best_global_position.proc_mappings, no_actors);
+                                    current_position.proc_sched, current_position.get_proc_mappings(),
+                                    best_global_position.proc_sched, best_global_position.get_proc_mappings(), no_actors);
 
     vector<int> curr_src_mappings(no_channels, 0);
     vector<int> bg_src_mappings(no_channels, 0);
     for(size_t i=0;i<no_channels;i++)
     {
         int src = applications->getChannel(i)->source;
-        curr_src_mappings[i] = current_position.proc_mappings[src];
-        bg_src_mappings[i] = best_global_position.proc_mappings[src];
+        curr_src_mappings[i] = current_position.proc_mappings[src].value();
+        bg_src_mappings[i] = best_global_position.proc_mappings[src].value();
     }
     ///#- send schedules         
     new_pos.send_sched = crossover(new_pos.send_sched, 
@@ -98,8 +107,8 @@ void Chromosome::cross_mut()
     for(size_t i=0;i<no_channels;i++)
     {
         int dst = applications->getChannel(i)->destination;
-        curr_dst_mappings[i] = current_position.proc_mappings[dst];
-        bg_dst_mappings[i] = best_global_position.proc_mappings[dst];
+        curr_dst_mappings[i] = current_position.proc_mappings[dst].value();
+        bg_dst_mappings[i] = best_global_position.proc_mappings[dst].value();
     }
     ///#- recive schedules
     new_pos.rec_sched = crossover(new_pos.rec_sched, 
@@ -119,10 +128,11 @@ void Chromosome::cross_mut()
     current_position = new_pos;                                 
                                         
 }
-vector<int> Chromosome::crossover(vector<int> v1, vector<int> v2)
+template<class T>
+vector<T> Chromosome::crossover(vector<T> v1, vector<T> v2)
 {
     size_t cr_point = random::random_indx(v1.size()-1);
-    vector<int> result;
+    vector<T> result;
     for(size_t i=0;i<cr_point;i++)
     {
         result.push_back(v1[i]);
@@ -143,6 +153,18 @@ vector<int> Chromosome::mutation(vector<int> v)
     size_t mut_point = random::random_indx(v.size()-1);
     int mut_val = random::random_int(-2,2);
     v[mut_point] += mut_val;
+    
+    return v;
+}
+vector<Domain> Chromosome::mutation(vector<Domain> v)
+{
+    ///#- randomly ignor mutation
+    if(random::random_bool() || v.empty())
+        return v;
+        
+    size_t mut_point = random::random_indx(v.size()-1);
+    int mut_val = random::random_indx(v[mut_point].domain.size()-1);
+    v[mut_point].set_index(mut_val);
     
     return v;
 }
