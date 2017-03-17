@@ -124,6 +124,8 @@ void search()
             << " ms)\nfitness=" << dur_fitness_s << "ms update=" << dur_update_s << "ms \n"
             << "no threads=" << no_threads 
             << " last update in generation " << last_update
+            << " last update time:" << std::chrono::duration_cast<std::chrono::seconds>(last_update_time).count()/60 << "m and "
+            << (std::chrono::duration_cast<std::chrono::seconds>(last_update_time).count()%60) << "s"
             << " pareto size " << par_f.pareto.size()
             << endl;
    cout << stat.str() << endl;
@@ -177,6 +179,7 @@ bool stagnation;
 const bool multi_obj = false;
 typedef std::chrono::high_resolution_clock runTimer; /**< Timer type. */
 runTimer::time_point t_start, t_endAll; /**< Timer objects for start and end of experiment. */
+std::chrono::duration<double> last_update_time;
 int no_reinits;
 int last_reinit;
 string name="meta";
@@ -197,7 +200,13 @@ void evaluate()
         {
             short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start);
             if(par_f.update_pareto(population[p]->get_current_position()))
+            {
                 last_update = current_generation;
+                last_short_term_update = current_generation;
+                last_update_time = runTimer::now() - t_start;
+                if(par_f.pareto.size() % 50 == 0)
+                    cout << "pareto size:" << par_f.pareto.size() << endl;
+            }
         }
     }
     else
@@ -211,6 +220,7 @@ void evaluate()
             if(long_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start))
             {
                 last_update = current_generation;
+                last_update_time = runTimer::now() - t_start;
                 memory_hist.push_back(long_term_memory);
                  out << "reinit:" << no_reinits << endl                    
                      << "gen after reinit:" << current_generation - last_reinit << endl
@@ -264,10 +274,13 @@ void print()
    
    for(auto p : par_f.pareto)
    {
-       vector<int> tmp;
-       tmp.push_back(p.fitness_func());
-       tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());       
-       data.push_back(tmp);
+       if(p.cnt_violations == 0)
+       {
+           vector<int> tmp;
+           tmp.push_back(p.fitness_func());
+           tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());                  
+           data.push_back(tmp);
+       }
    }
    for(auto m : memory_hist)
        for(auto p : m.mem)
