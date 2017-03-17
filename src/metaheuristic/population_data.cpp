@@ -60,15 +60,21 @@ bool ParetoFront::dominate(Position& p)
 bool ParetoFront::update_pareto(Position p)
 {
     bool is_updated = false;
+    vector<int> remove_indx={};
     if(!dominate(p))
     {
         for(size_t i=0;i<pareto.size();i++)
         {
             if(p.dominate(pareto[i]))
             {
-                 pareto.erase (pareto.begin()+i);
-            }           
+                 remove_indx.push_back(i);
+            }     
         }
+        for(int i=remove_indx.size()-1;i>=0;i--)
+        {
+            int indx = remove_indx[i];            
+            pareto.erase (pareto.begin()+indx);           
+         }
         pareto.push_back(p);
         is_updated = true;
     }
