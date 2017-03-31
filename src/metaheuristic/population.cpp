@@ -24,7 +24,7 @@ Population(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _application, 
                     cfg(_cfg),
                     mapping(_mapping),
                     applications(_application),
-                    no_objectives(mapping->getNumberOfApps()+2),
+                    no_objectives(mapping->getNumberOfApps()+1),
                     no_individulas(cfg.settings().no_individulas),
                     no_generations(cfg.settings().generation),
                     current_generation(0),
@@ -195,7 +195,10 @@ void evaluate()
     {
         for(size_t p=0;p<population.size();p++)
         {
-            short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start);
+            if(short_term_memory.update_memory(population[p]->get_current_position(), runTimer::now() - t_start))
+            {
+                last_short_term_update = current_generation;
+            }
             if(par_f.update_pareto(population[p]->get_current_position()))
             {
                 last_update = current_generation;
@@ -288,7 +291,7 @@ void print()
            {
                tmp.push_back(p.fitness_func());
                tmp.insert(tmp.end(), p.fitness.begin(), p.fitness.end());
-               auto durAll_ms = std::chrono::duration_cast<std::chrono::milliseconds>(m.last_update).count();
+               auto durAll_ms = std::chrono::duration_cast<std::chrono::microseconds>(m.last_update).count();
                tmp.push_back(durAll_ms);
                data.push_back(tmp);
            }
