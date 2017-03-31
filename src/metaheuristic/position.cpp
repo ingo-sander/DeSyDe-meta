@@ -85,11 +85,14 @@ Position& Position::operator=(const Position& p)
         rec_sched.push_back(std::move(s));               
     return *this;
 }
-
+bool Position::dominate(Position& p_in) const
+{
+    return dominate(p_in, weights);
+}
 /**
  * Do I dominate p_in?
  */ 
-bool Position::dominate(Position& p_in) const
+bool Position::dominate(Position& p_in, vector<float> w) const
 {
     if(empty())
         return false;
@@ -114,7 +117,7 @@ bool Position::dominate(Position& p_in) const
         
         for(size_t i=0;i<fitness.size();i++)
         {
-            if(weights[i] > 0 && fitness[i] > p_in.fitness[i] )
+            if(w[i] > 0 && fitness[i] > p_in.fitness[i] )
             {
                 return false;
             }

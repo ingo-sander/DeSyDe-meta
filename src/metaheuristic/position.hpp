@@ -195,6 +195,7 @@ public:
      * Do I dominate p_in?
      */ 
     bool dominate(Position& p_in) const;
+    bool dominate(Position& p_in, vector<float>) const;
     float fitness_func() const;
     bool empty() const;
     bool invalid() const;
