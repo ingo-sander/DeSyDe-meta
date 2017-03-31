@@ -97,6 +97,7 @@ private:
     const float delta_w_t = 0.01; /*!< Delta for decreasing \c w_t.*/
     const float min_w_t = 0.1;/*!< Minimum \c w_t.*/ 
     const float max_w_t;/*!< Maximum \c w_t.*/ 
+    vector<float> local_obj_weights;
     /**
      * Updates the speed of the particle using the following equation:
      * \f[

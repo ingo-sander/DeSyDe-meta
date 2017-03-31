@@ -10,7 +10,15 @@ Particle::Particle(shared_ptr<Mapping> _mapping, shared_ptr<Applications> _appli
                     w_t(_w_t),
                     w_lb(_w_lb),
                     w_gb(_w_gb),
-                    max_w_t(_w_t){}
+                    max_w_t(_w_t)
+                    {
+                        for(size_t i=0;i<_o_w.size();i++)
+                        if((int) i == objective)
+                            local_obj_weights.push_back(1);
+                        else    
+                            local_obj_weights.push_back(0);
+                                  
+                    }
                     
 Particle::Particle(const Particle& _p):
                     Individual(_p),
@@ -20,7 +28,8 @@ Particle::Particle(const Particle& _p):
                     w_t(_p.w_t),
                     w_lb(_p.w_lb),
                     w_gb(_p.w_gb),
-                    max_w_t(_p.max_w_t) {}
+                    max_w_t(_p.max_w_t),
+                    local_obj_weights(_p.local_obj_weights) {}
 
 Speed Particle::get_speed()
 {
@@ -28,7 +37,7 @@ Speed Particle::get_speed()
 }
 void Particle::update()
 {   
-    if(current_position.dominate(best_local_position) || best_local_position.empty() || best_local_position == current_position)
+    if(current_position.dominate(best_local_position, local_obj_weights) || best_local_position.empty() || best_local_position == current_position)
     {   
         best_local_position = current_position;
     }
