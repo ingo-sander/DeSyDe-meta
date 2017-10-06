@@ -6,8 +6,9 @@ GA_Population::GA_Population(shared_ptr<Mapping> _mapping, shared_ptr<Applicatio
     short_term_memory.set_mem_size(1);
     name = "GA";
     
-    int thresh = sqrt(no_individulas)+1;
-    for(int i=0;i<thresh;i++)
+    int thresh = sqrt(no_individulas)+1;    
+    
+    /*for(int i=0;i<thresh;i++)
     {
         for(int j=i+1;j<thresh;j++)
         {
@@ -15,7 +16,24 @@ GA_Population::GA_Population(shared_ptr<Mapping> _mapping, shared_ptr<Applicatio
             //if(i != j)
                 possible_parents.push_back(par);
         }
-    }   
+        
+    }
+    */    
+    for(size_t i=0;i<(no_individulas*2)/6;i++)
+    {
+        int par1 = random::random_int(0, thresh-1);
+        int par2 = random::random_int(0, thresh-1);
+        pair<int,int> par (par1,par2);
+        possible_parents.push_back(par);        
+    }
+    for(size_t i=0;i<=no_individulas/6;i++)
+    {
+        int par1 = random::random_int(thresh, no_individulas-1);
+        int par2 = random::random_int(thresh, no_individulas-1);
+        pair<int,int> par (par1,par2);
+        possible_parents.push_back(par);        
+    }
+    cout << "no parents:" << possible_parents.size() << endl;
 }
 
 void GA_Population::init()
@@ -51,7 +69,7 @@ void GA_Population::update(int t_id)
     int end_id = start_id + individual_per_thread;
     if(t_id == no_threads -1)///Last thread takes care of all remaining particles
         end_id = no_individulas-1;
-    if(cfg.settings().multi_obj)
+    /*if(cfg.settings().multi_obj)
     {
         shared_ptr<Chromosome> parent1;
         shared_ptr<Chromosome> parent2;;
@@ -70,7 +88,7 @@ void GA_Population::update(int t_id)
             population[i]->update();
         }
     }
-    else
+    else*/
     {
         for(int i=start_id;i+1<end_id;i+=2)    
         {
@@ -124,18 +142,25 @@ void GA_Population::select_fittest()
 void GA_Population::new_population()
 {
     //select_fittest();
-    if(cfg.settings().multi_obj)
-        return;
+    /*if(cfg.settings().multi_obj)
+        return;*/
     population = next_population;
 }
 void GA_Population::sort_population()
 {
     
     if(cfg.settings().multi_obj)
-        return;
-    std::sort(population.begin(), population.end(),
+    {
+        std::sort(population.begin(), population.end(),
+                    [](shared_ptr<Chromosome> const a, shared_ptr<Chromosome> const b) -> bool 
+                    { return a->get_current_position().fitness_func() < b->get_current_position().fitness_func(); } ); 
+    }
+    else
+    {
+        std::sort(population.begin(), population.end(),
                     [](shared_ptr<Chromosome> const a, shared_ptr<Chromosome> const b) -> bool 
                     { return a->dominate(b); } );    
+    }
     //We also slecet parents here
     parents.clear();
     vector<int> all_indices;
